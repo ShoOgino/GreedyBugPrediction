@@ -6,7 +6,6 @@ from torch.nn.modules.rnn import LSTM
 from torch.utils import data
 from src.result.result4BugPrediction import Result4BugPrediction
 import torch
-import torchvision
 import torch.nn.functional as F
 import torch.nn as nn
 import optuna
@@ -20,61 +19,80 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, classification_report
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score
-import pickle
 from collections import OrderedDict
-from torch.utils.data import DataLoader, dataset
+from torch.utils.data import DataLoader
 from torchinfo import summary
 from torchvision import transforms
 from tqdm import tqdm
+from src.dataset.dataset import Dataset
 
-class ModelASTSeq(nn.Module):
+class Model(nn.Module):
     def __init__(self):
         super().__init__()
         self.trials4HyperParameterSearch = 100
+        self.epochsEarlyStopping = 100
         self.isCrossValidation = True
+        self.splitsize = 5
         self.device = "cuda:0"
-        torch.backends.cudnn.enabled = False
+        torch.backends.cudnn.enabled = True
 
-    class Dataset(torch.utils.data.Dataset):
-        def __init__(self, dataset):
-            self.dataset = dataset
-            self.dataset[0] = torch.tensor(dataset[0]).float()
-            print(self.dataset[0].shape)
-            self.dataset[1] = torch.tensor(dataset[1]).float()
-            print(self.dataset[1].shape)
-        def getNumFeatures(self):
-            return len(self.dataset[1][0][0])
-        def __len__(self):
-            return len(self.dataset[0])
-        def __getitem__(self, index):
-            return self.dataset[1][index], self.dataset[0][index]
+    def setTrials4HyperParameterSearch(self, trials4HyperParameterSearch):
+        self.trials4HyperParameterSearch = trials4HyperParameterSearch
 
-    def getModel(self, hp, numFeatures):
-        numLayers = hp["numLayers"]
-        sizeOutput = 1
-        numParameters = hp["numParameters"]
-        rateDropout = hp["rateDropout"]
-        self.LSTM = nn.LSTM(
-                input_size = numFeatures,
-                hidden_size = numParameters,
-                num_layers = numLayers,
-                batch_first = True,
-                dropout = rateDropout,
-                bidirectional = True
-            )
-        self.linearOutput = nn.Linear(numParameters*2*numLayers, sizeOutput)
-        self.activationOutput = nn.Sigmoid()
+    def setPeriod4HyperParameterSearch(self, period4HyperPrameterSearch):
+        self.period4HyperParameterSearch = period4HyperPrameterSearch
+
+    def setIsCrossValidation(self, isCrossValidation):
+        self.isCrossValidation = isCrossValidation
+
+    def setSplitSize4Validation(self, splitsize):
+        self.splitsize = splitsize
+
+    def defineNetwork(self, hp, dataset):
+        # todo ここで、datasetの説明変数にどんな構造のデータが何種類あるのかを把握。それ次第でモデルの形状を変更する。
+        self.componentsNetwork = {}
+        if(0 < len(dataset.samples[0]["x"]["ast"]["nodes"])):
+            pass
+        if(0 < len(dataset.samples[0]["x"]["astseq"])):
+            self.componentsNetwork["astseq"]["lstm"] = nn.LSTM(
+                    input_size = 99,
+                    hidden_size = hp["numParameters"],
+                    num_layers = hp["numLayers"],
+                    batch_first = True,
+                    dropout = hp["rateDropout"],
+                    bidirectional = True
+                )
+            self.componentsNetwork["astseq"]["linear"] = nn.Linear(hp["numParameters"]*2*hp["numLayers"], len(dataset.samples[0]["y"]))
+        if(0 < len(dataset.samples[0]["x"]["codemetrics"])):
+            pass
+        if(0 < len(dataset.samples[0]["x"]["commitgraph"]["nodes"])):
+            pass
+        if(0 < len(dataset.samples[0]["x"]["commitseq"])):
+            pass
+        if(0 < len(dataset.samples[0]["x"]["processmetrics"])):
+            pass
+        self.componentsNetwork["activation"] = nn.Sigmoid()
         def forward(x):
-            _, (parametersHiddenBiLSTM, _) = self.LSTM(x)
-            parametersHiddenBiLSTM = torch.cat(torch.split(parametersHiddenBiLSTM, 1), dim=2)
-            y = self.linearOutput(parametersHiddenBiLSTM)
-            y = self.activationOutput(y)
+            if("ast" in x):
+                pass
+            if("astseq" in x):
+                _, (parametersHiddenBiLSTM, _) = self.componentsNetwork["astseq"]["LSTM"](x)
+                parametersHiddenBiLSTM = torch.cat(torch.split(parametersHiddenBiLSTM, 1), dim=2)
+                astseq = self.componentsNetwork["astseq"]["linear"](parametersHiddenBiLSTM)
+            if("codemetrics" in x):
+                pass
+            if("commitgraph" in x):
+                pass
+            if("commitseq" in x):
+                pass
+            if("processmetrics" in x):
+                pass
+            y = self.componentsNetwork["activation"](astseq)
             return y
         self.forward = forward
         model = self.to(self.device)
         summary(
             model,
-            input_size=(1, 1024, numFeatures),
             col_names=["output_size", "num_params"]
         )
         return model
@@ -121,11 +139,11 @@ class ModelASTSeq(nn.Module):
 
                         ysPredicted =  torch.round(ysPredicted)
                         corrects+=int((ysPredicted==ys).sum())
-                        total+=xs.size(0)
+                        total+=ys.size(0)
                         accuracy = corrects/total
                         #loss関数で通してでてきたlossはCrossEntropyLossのreduction="mean"なので平均
                         #batch sizeをかけることで、batch全体での合計を今までのloss_sumに足し合わせる
-                        loss_sum += float(loss) * xs.size(0)
+                        loss_sum += float(loss) * ys.size(0)
                         running_loss = loss_sum/total
                         pbar.set_postfix({"loss":running_loss,"accuracy":accuracy })
                         pbar.update(1)
@@ -139,20 +157,12 @@ class ModelASTSeq(nn.Module):
                         print("update!")
                         lossValidBest = loss_sum
                         epochBestValid = epoch
-            if(100<epoch-epochBestValid):
+            if(self.epochsEarlyStopping<epoch-epochBestValid):
                 break
         return epochBestValid, lossesTrain, lossesValid, accsTrain, accsValid
 
-    def setTrials4HyperParameterSearch(self, trials4HyperParameterSearch):
-        self.trials4HyperParameterSearch = trials4HyperParameterSearch
 
-    def setPeriod4HyperParameterSearch(self, period4HyperPrameterSearch):
-        self.period4HyperParameterSearch = period4HyperPrameterSearch
-
-    def setIsCrossValidation(self, isCrossValidation):
-        self.isCrossValidation = isCrossValidation
-
-    def plotLearningCurve(self, lossesTrain, lossesValid, accTrain, accValid, numberTrial):
+    def plotGraphTraining(self, lossesTrain, lossesValid, accTrain, accValid, numberTrial):
         epochs = range(len(lossesTrain))
 
         fig = plt.figure()
@@ -164,36 +174,75 @@ class ModelASTSeq(nn.Module):
         plt.title(str(numberTrial))
         plt.legend()
 
-        pathLogGraph = os.path.join(Result4BugPrediction.getPathResult(), str(numberTrial) + '.png')
-        fig.savefig(pathLogGraph)
+        pathGraph = os.path.join(Result4BugPrediction.getPathResult(), str(numberTrial) + '.png')
+        fig.savefig(pathGraph)
         plt.clf()
         plt.close()
 
-    def searchHyperParameter(self, arrayOfD4TAndD4V):
+    def plotGraphHyperParameterSearch(self, trials):
+        numOfTrials = range(len(trials))
+
+        fig = plt.figure()
+        plt.title("HyperParameterSearch")
+        plt.ylim(0, 1)
+        plt.plot(numOfTrials, trials, linestyle="-", color='b', label = 'lossTrain')
+        plt.legend()
+
+        pathGraph = os.path.join(Result4BugPrediction.getPathResult(), str("hyperParameterSearch") + '.png')
+        fig.savefig(pathGraph)
+        plt.clf()
+        plt.close()
+
+    def searchHyperParameter(self, datasets_Train_Valid):
         def objectiveFunction(trial):
-            hp = {}
-            hp["numLayers"]=trial.suggest_int('numlayers', 1, 1)
-            hp["numParameters"] = int(trial.suggest_int('numParameters', 16, 512))
-            hp["rateDropout"] = trial.suggest_uniform('rateDropout', 0.0, 0.5)
-            hp["optimizer"] = trial.suggest_categorical('optimizer', ['adam'])
-            hp["lrAdam"] = trial.suggest_loguniform('lrAdam', 1e-5, 1e-2)
-            hp["beta1Adam"] = trial.suggest_uniform('beta1Adam', 0.9, 1)
-            hp["beta2Adam"] = trial.suggest_uniform('beta2Adam', 0.999, 1)
-            hp["epsilonAdam"] = trial.suggest_loguniform('epsilonAdam', 1e-10, 1e-5)
-            hp["sizeBatch"] = trial.suggest_int("sizeBatch", 16, 128)
             numEpochs = 10000
             scoreAverage=0
-            for index4CrossValidation in range(len(arrayOfD4TAndD4V)):
+            for index4CrossValidation in range(len(datasets_Train_Valid)):
                 # prepare dataset
-                dataset4Train = self.Dataset([list(i) for i in zip(*arrayOfD4TAndD4V[index4CrossValidation]["training"])][1:])
-                dataset4Test = self.Dataset([list(i) for i in zip(*arrayOfD4TAndD4V[index4CrossValidation]["validation"])][1:])
+                dataset4Train = Dataset(datasets_Train_Valid[index4CrossValidation]["train"])
+                dataset4Test = Dataset(datasets_Train_Valid[index4CrossValidation]["valid"])
+                hp = {}
+                if(0 < len(dataset4Train.samples[0]["x"]["ast"]["nodes"])):
+                    hp["ast"] = {}
+                if(0 < len(dataset4Train.samples[0]["x"]["astseq"])):
+                    hp["astseq"] = {}
+                    hp["astseq"]["numLayers"] = trial.suggest_int('numLayers', 1, 3)
+                    hp["astseq"]["numParameters"] = int(trial.suggest_int('numParameters', 16, 128))
+                    hp["astseq"]["rateDropout"] = trial.suggest_uniform('rateDropout', 0.0, 0.3)
+                if(0 < len(dataset4Train.samples[0]["x"]["codemetrics"])):
+                    hp["codemetrics"] = {}
+                if(0 < len(dataset4Train.samples[0]["x"]["commitgraph"]["nodes"])):
+                    hp["commitgraph"] = {}
+                if(0 < len(dataset4Train.samples[0]["x"]["commitseq"])):
+                    hp["commitseq"] = {}
+                    hp["astseq"]["numLayers"] = trial.suggest_int('numLayers', 1, 3)
+                    hp["astseq"]["numParameters"] = int(trial.suggest_int('numParameters', 16, 128))
+                    hp["astseq"]["rateDropout"] = trial.suggest_uniform('rateDropout', 0.0, 0.3)
+                if(0 < len(dataset4Train.samples[0]["x"]["processmetrics"])):
+                    hp["processmetrics"] = {}
+                hp["optimizer"] = trial.suggest_categorical('optimizer', ['adam'])
+                hp["lrAdam"] = trial.suggest_loguniform('lrAdam', 1e-6, 1e-3)
+                hp["beta1Adam"] = trial.suggest_uniform('beta1Adam', 0.9, 1)
+                hp["beta2Adam"] = trial.suggest_uniform('beta2Adam', 0.999, 1)
+                hp["epsilonAdam"] = trial.suggest_loguniform('epsilonAdam', 1e-10, 1e-8)
+                hp["sizeBatch"] = trial.suggest_int("sizeBatch", 16, 128)
                 dataloader={
-                    "train": DataLoader(dataset4Train, batch_size = hp["sizeBatch"], pin_memory=True),
-                    "valid": DataLoader(dataset4Test, batch_size = hp["sizeBatch"], pin_memory=True)
+                    "train": DataLoader(
+                        dataset4Train,
+                        batch_size = hp["sizeBatch"],
+                        pin_memory=True,
+                        collate_fn = dataset4Train.collate_fn_my
+                    ),
+                    "valid": DataLoader(
+                        dataset4Test,
+                        batch_size = hp["sizeBatch"],
+                        pin_memory=True,
+                        collate_fn= dataset4Test.collate_fn_my
+                    )
                 }
 
                 # prepare model architecture
-                model = self.getModel(hp, dataset4Train.getNumFeatures())
+                model = self.defineNetwork(hp, dataset4Train)
 
                 # prepare loss function
                 lossFunction = nn.BCELoss()
@@ -203,8 +252,9 @@ class ModelASTSeq(nn.Module):
 
                 # train!
                 epochBestValid, lossesTrain, lossesValid, accsTrain, accsValid = self.train_(dataloader, model, lossFunction, optimizer, numEpochs)
-                self.plotLearningCurve(lossesTrain, lossesValid, accsTrain, accsValid, trial.number)
-                trial.set_user_attr("numEpochs", epochBestValid)
+                self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, trial.number)
+                trial.set_user_attr("numEpochs", epochBestValid+1)
+                
                 # 1エポックだけ偶然高い精度が出たような場合を弾くために、前後のepochで平均を取る。
                 lossValMin = min(lossesValid)
                 indexValMin = lossesValid.index(lossValMin)
@@ -215,15 +265,27 @@ class ModelASTSeq(nn.Module):
                     score += lossesValid[index5Forward-i]
                 score = score / 6
                 scoreAverage += score
-            scoreAverage = scoreAverage / len(arrayOfD4TAndD4V)
+            scoreAverage = scoreAverage / len(datasets_Train_Valid)
             #全体のログをloggerで出力
             with open(Result4BugPrediction.getPathLogSearchHyperParameter(), mode='a') as f:
                 f.write(str(score)+","+str(trial.datetime_start)+","+str(trial.params)+'\n')
             return scoreAverage
         study = optuna.create_study()
-        study.optimize(objectiveFunction, n_trials=self.trials4HyperParameterSearch)
+        hpDefault = {}
+        hpDefault["numLayers"] = 2
+        hpDefault["numParameters"] = 128
+        hpDefault["rateDropout"] = 0
+        hpDefault["optimizer"] = "adam"
+        hpDefault["lrAdam"] = 1e-3
+        hpDefault["beta1Adam"] = 0.9
+        hpDefault["beta2Adam"] = 0.999
+        hpDefault["epsilonAdam"] = 1e-8
+        hpDefault["sizeBatch"] = 32
+        study.enqueue_trial(hpDefault)
+        study.optimize(objectiveFunction, timeout=self.period4HyperParameterSearch)
         #save the hyperparameter that seems to be the best.
-        with open(Result4BugPrediction.getPathHyperParameter(), mode='a') as file:
+        #self.plotGraphHyperParameterSearch(study.get_trials())
+        with open(Result4BugPrediction.getPathHyperParameter(), mode='w') as file:
             json.dump(dict(study.best_params.items()^study.best_trial.user_attrs.items()), file, indent=4)
         return Result4BugPrediction.getPathHyperParameter()
 
@@ -235,12 +297,22 @@ class ModelASTSeq(nn.Module):
         dataset4Train = self.Dataset([list(i) for i in zip(*dataset4SearchParameter["train"])][1:])
         dataset4Test = self.Dataset([list(i) for i in zip(*dataset4SearchParameter["valid"])][1:])
         dataloader={
-            "train": DataLoader(dataset4Train, batch_size = hp["sizeBatch"], pin_memory=True),
-            "valid": DataLoader(dataset4Test, batch_size = hp["sizeBatch"], pin_memory=True)
+            "train": DataLoader(
+                dataset4Train,
+                batch_size = hp["sizeBatch"],
+                pin_memory=True,
+                collate_fn = self.collate_fn_my
+            ),
+            "valid": DataLoader(
+                dataset4Test,
+                batch_size = hp["sizeBatch"],
+                pin_memory=True,
+                collate_fn = self.collate_fn_my
+            )
         }
 
         # prepare model architecture
-        model = self.getModel(hp, dataset4Train.getNumFeatures())
+        model = self.defineNetwork(hp, dataset4Train.getNumFeatures())
 
         # prepare loss function
         lossFunction = nn.BCELoss()
@@ -250,7 +322,7 @@ class ModelASTSeq(nn.Module):
 
         # prepare model parameters
         _, lossesTrain, lossesValid, accsTrain, accsValid = self.train_(dataloader, model, lossFunction, optimizer, hp["numEpochs"])
-        self.plotLearningCurve(lossesTrain, lossesValid, accsTrain, accsValid, 10000)
+        self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, 10000)
 
         pathParameter = os.path.join(Result4BugPrediction.getPathResult(), 'parameter')
         torch.save(model.state_dict(), pathParameter)
@@ -264,11 +336,16 @@ class ModelASTSeq(nn.Module):
         # prepare dataset
         dataset4Test = self.Dataset([list(i) for i in zip(*dataset4Test)][1:])
         dataloader={
-            "valid": DataLoader(dataset4Test, batch_size = hp["sizeBatch"], pin_memory=True)
+            "valid": DataLoader(
+                dataset4Test,
+                batch_size = hp["sizeBatch"],
+                pin_memory=True,
+                collate_fn = self.collate_fn_my
+            )
         }
 
         # prepare model architecture
-        model = self.getModel(hp, dataset4Test.getNumFeatures())
+        model = self.defineNetwork(hp, dataset4Test.getNumFeatures())
 
         # prepare model parameters
         paramaters = torch.load(Result4BugPrediction.getPathParameter())

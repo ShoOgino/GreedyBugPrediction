@@ -8,7 +8,7 @@ from tqdm import tqdm
 
 tokenizer = AutoTokenizer.from_pretrained("microsoft/codebert-base")
 model = AutoModel.from_pretrained("microsoft/codebert-base")
-# ファイルごとにトークン列のベクトルを作って保存。バグがあるかどうかも考える
+# ファイルごとにトークン列のベクトルを作って保存。バグの有無も考える
 bugdata ={}
 records = []
 pathProject = r"C:\Users\login\data\workspace\greedyBugPrediction\MLTool\datasets\egit"

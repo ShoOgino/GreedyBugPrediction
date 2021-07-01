@@ -1,7 +1,3 @@
-import sys
-import glob
-import json
-import subprocess
 from src.result.result4BugPrediction import Result4BugPrediction
 
 class Maneger:
@@ -9,12 +5,13 @@ class Maneger:
         pass
 
     def run(self, experiment):
-        experiment.dataset.loadDataset()
+        experiment.dataset.loadSamples()
         experiment.dataset.showSummary()
         if "searchHyperParameter" in experiment.purpose:
             print("-----searchHyperParameter-----")
+            experiment.dataset.generateDatasetsTrainValid(isCrossValidation = True, numOfSplit = 5)
             pathHyperParameter = experiment.model.searchHyperParameter(
-                experiment.dataset.getDataset4SearchHyperParameter()
+                experiment.dataset.datasets_Train_Valid
             )
             Result4BugPrediction.setPathHyperParameter(pathHyperParameter)
         if "searchParameter" in experiment.purpose:

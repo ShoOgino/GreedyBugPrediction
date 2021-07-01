@@ -1,5 +1,5 @@
-from src.dataset.datasetASTSeq import DatasetASTSeq
-from src.model.modelASTSeq import ModelASTSeq
+from src.dataset.datasets import Datasets
+from src.model.model import Model
 from src.result.result4BugPrediction import Result4BugPrediction
 from src.manager import Maneger
 
@@ -16,17 +16,25 @@ class Experiment():
 
         self.purpose = ["searchHyperParameter", "searchParameter", "test"]
 
-        self.dataset = DatasetASTSeq()
-        self.dataset.setPathSamples(
+        self.dataset = Datasets()
+        # "ast", "astseq", "codemetrics", "commitgraph", "commitseq", "processmetrics"
+        self.dataset.setInputData(["ast", "astseq", "codemetrics", "commitgraph", "commitseq", "processmetrics"])
+        self.dataset.setPathsSample(
             [
-                r"C:\Users\login\data\workspace\GBP\datasets\egit\modules_"
-            ]
+                r"C:\Users\login\data\workspace\MLTool\datasets\egit\output\R5_r_train"
+            ],
+            isForTest = False
         )
-        self.dataset.setIsCrossValidation(False)
-        self.dataset.setSplitSize4Validation(5)
-
-        self.model = ModelASTSeq()
-        self.model.setTrials4HyperParameterSearch(1)
+        self.dataset.setPathsSample(
+            [
+                r"C:\Users\login\data\workspace\MLTool\datasets\egit\output\R5_r_test"
+            ], 
+            isForTest = True
+        )
+        self.model = Model()
+        self.model.setIsCrossValidation(False)
+        self.model.setSplitSize4Validation(5)
+        self.model.setPeriod4HyperParameterSearch(60*60*10)
 
         Result4BugPrediction.clear()
         Result4BugPrediction.setPathResult(os.path.dirname(os.path.dirname(__file__))+"/results/"+self.id)
