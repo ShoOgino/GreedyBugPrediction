@@ -1,27 +1,40 @@
-from src.result.result4BugPrediction import Result4BugPrediction
+from src.data.DataManeger import DataManeger
+from src.model.Modeler import Modeler
+from src.config.cfg import cfg
+
+import os
+import shutil
 
 class Maneger:
     def __init__(self):
         pass
 
-    def run(self, experiment):
-        experiment.dataset.loadSamples()
-        experiment.dataset.showSummary()
-        if "searchHyperParameter" in experiment.purpose:
+    def run(self):
+        # 実験結果フォルダを作成
+        os.makedirs(cfg.pathDirOutput, exist_ok=True)
+        # 実験結果フォルダへ実行環境情報を保存
+        shutil.copy(__file__, cfg.pathDirOutput)
+
+        # データ職人生成
+        dataManeger = DataManeger()
+        dataManeger.setPathsSample(cfg.pathsSampleTrain, False)
+        dataManeger.setPathsSample(cfg.pathsSampleTest, True)
+        dataManeger.loadSamples()
+        dataManeger.showSummary()
+
+        # モデル職人生成
+        modeler = Modeler()
+
+        # データ職人・モデル職人にタスクを移譲
+        if(cfg.checkPurposeContainsSearchHyperParameter()):
             print("-----searchHyperParameter-----")
-            experiment.dataset.generateDatasetsTrainValid(isCrossValidation = True, numOfSplit = 5)
-            pathHyperParameter = experiment.model.searchHyperParameter(
-                experiment.dataset.datasets_Train_Valid
-            )
-            Result4BugPrediction.setPathHyperParameter(pathHyperParameter)
-        if "searchParameter" in experiment.purpose:
+            dataManeger.generateDatasetsTrainValid(isCrossValidation = False, numOfSplit = 5)
+            modeler.searchHyperParameter(dataManeger.datasets_Train_Valid)
+        if(cfg.checkPurposeContainsSearchParameter()):
             print("-----searchParameter----------")
-            pathParameter = experiment.model.searchParameter(
-                experiment.dataset.getDataset4SearchParameter()
-            )
-            Result4BugPrediction.setPathParameter(pathParameter)
-        if "test" in experiment.purpose:
+            dataManeger.generateDatasetsTrainTest()
+            modeler.searchParameter(dataManeger.datasets_Train_Test)
+        if(cfg.checkPurposeContainsTest()):
             print("-----test---------------------")
-            experiment.model.test(
-                experiment.dataset.getDataset4Test()
-            )
+            dataManeger.generateDatasetsTrainTest()
+            modeler.test(dataManeger.datasets_Train_Test)

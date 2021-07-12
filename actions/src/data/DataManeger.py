@@ -1,42 +1,39 @@
+from src.config.cfg import cfg
+from src.data.Dataset import Dataset
+
 import glob
 import json
 import os
 import random
-
 import numpy as np
 import torch
 from torch.functional import split
 
-from src.dataset.dataset import Dataset
-
-class Datasets(torch.utils.data.Dataset):
+class DataManeger(torch.utils.data.Dataset):
     def __init__(self):
         self.pathsSample4Train = []
         self.pathsSample4Test = []
         self.samples4Train = []
         self.samples4Test = []
         self.datasets_Train_Valid = []
-        self.datasets_Train_Test = []
-        self.selectedInputData = []
+        self.datasets_Train_Test = {}
+        self.selectedInputData = cfg.typesInput
 
     def setPathsSample(self, pathsSample, isForTest=False):
         if(isForTest):
             for path in pathsSample:
                 if(os.path.isdir(path)):
                     pathsSearched = glob.glob(path+"\\**\\*.json", recursive=True)
-                    self.pathsSample4Train.extend(pathsSearched)
+                    self.pathsSample4Test.extend(pathsSearched)
                 else:
-                    self.pathsSample4Train.append(path)
+                    self.pathsSample4Test.append(path)
         else:
             for path in pathsSample:
                 if(os.path.isdir(path)):
                     pathsSearched = glob.glob(path+"\\**\\*.json", recursive=True)
-                    self.pathsSample4Test.extend(pathsSearched)
+                    self.pathsSample4Train.extend(pathsSearched)
                 else:
-                    self.pathsSample4Test.append(path)
-
-    def setInputData(self, selectedInputData):
-        self.selectedInputData = selectedInputData
+                    self.pathsSample4Train.append(path)
 
     def loadSamples(self):
         def flattenTree(node):
@@ -49,7 +46,7 @@ class Datasets(torch.utils.data.Dataset):
             vectorOnehot = [0] * 99
             vectorOnehot[numType]=1
             return vectorOnehot
-        def loadSample(pathSample, selectedInputData, listSamples, module2Num, committer2Num, tableInterval, tableChurn, map2StandardizeMetricsCode, map2StandardizeMetricsProcess):
+        def loadSample(pathSample, listSamples, module2Num, committer2Num, tableInterval, tableChurn, map2StandardizeMetricsCode, map2StandardizeMetricsProcess):
             sample = {}
             with open(pathSample, encoding="utf-8") as fSample4Train:
                 sampleJson = json.load(fSample4Train)
@@ -69,7 +66,7 @@ class Datasets(torch.utils.data.Dataset):
                     "commitseq": [],
                     "processmetrics": []
                 }
-                if("ast" in selectedInputData):
+                if(cfg.checkASTExists()):
                     def findNodes(node):
                         nodes = flattenTree(node)
                         for index, node in enumerate(nodes):
@@ -84,7 +81,7 @@ class Datasets(torch.utils.data.Dataset):
                         return edges
                     sample["x"]["ast"]["nodes"] = findNodes(sampleJson["ast"])
                     sample["x"]["ast"]["edges"] = findEdges(sampleJson["ast"])
-                if("astseq" in selectedInputData):
+                if(cfg.checkASTSeqExists()):
                     def onehotnizeAST(ast):
                         astOnehotnized = []
                         for node in ast:
@@ -93,7 +90,7 @@ class Datasets(torch.utils.data.Dataset):
                         return astOnehotnized
                     nodes = flattenTree(sampleJson["ast"])
                     sample["x"]["astseq"] = onehotnizeAST(nodes)
-                if("codemetrics" in selectedInputData):
+                if(cfg.checkCodeMetricsExists()):
                     sample["x"]["codemetrics"].extend(
                         [
                             (float(sampleJson["fanIn"])-map2StandardizeMetricsCode["fanIn"][0]) / map2StandardizeMetricsCode["fanIn"][1],
@@ -108,7 +105,7 @@ class Datasets(torch.utils.data.Dataset):
                             (float(sampleJson["loc"])-map2StandardizeMetricsCode["loc"][0]) / map2StandardizeMetricsCode["loc"][1],
                         ]
                     )
-                if("commitgraph" in selectedInputData):
+                if(cfg.checkCommitGraphExists()):
                     numOfCommits = len(sampleJson["commitGraph"])
                     sample["x"]["commitgraph"]["nodes"] = [[None] for i in range(numOfCommits)]
                     for i in range(numOfCommits):
@@ -148,10 +145,10 @@ class Datasets(torch.utils.data.Dataset):
                                 vector[5][module2Num[pathModule]] = 1
                             else:
                                 vector[5][0] = 1
-                        sample["x"]["commitgraph"]["nodes"][node["num"]] = vector
+                        sample["x"]["commitgraph"]["nodes"][node["num"]] = vector[0]+vector[1]+vector[2]+vector[3]+vector[4][0]+vector[4][1]+vector[4][2]+vector[5]
                         for numParent in node["parents"]:
                             sample["x"]["commitgraph"]["edges"].append([node["num"], numParent])
-                if("commitseq" in selectedInputData):
+                if(cfg.checkCommitSeqExists()):
                     numOfCommits = len(sampleJson["commitGraph"])
                     sample["x"]["commitseq"] = [None] * numOfCommits
                     for i in range(numOfCommits):
@@ -191,8 +188,8 @@ class Datasets(torch.utils.data.Dataset):
                                 vector[5][module2Num[pathModule]] = 1
                             else:
                                 vector[5][0] = 1
-                        sample["x"]["commitseq"][node["num"]] = vector
-                if("processmetrics" in selectedInputData):
+                        sample["x"]["commitseq"][node["num"]] = vector[0]+vector[1]+vector[2]+vector[3]+vector[4][0]+vector[4][1]+vector[4][2]+vector[5]
+                if(cfg.checkProcessMetricsExists()):
                     sample["x"]["processmetrics"].extend(
                         [
                             (float(sampleJson["moduleHistories"])-map2StandardizeMetricsProcess["moduleHistories"][0]) / map2StandardizeMetricsProcess["moduleHistories"][1],
@@ -226,10 +223,10 @@ class Datasets(torch.utils.data.Dataset):
                         ]
                     )
             listSamples.append(sample)
-            name, ext = os.path.splitext(pathSample)
-            pathTest = name+"_test"
-            with open(pathTest, "w") as f:
-                json.dump(sample, f)
+            #name, ext = os.path.splitext(pathSample)
+            #pathVector = name+"_vector"
+            #with open(pathVector, "w") as f:
+            #    json.dump(sample, f)
         # 学習時のモジュールIDと総数、コミッターIDと総数、intervalの離散化範囲、churnの離散化範囲、各種メトリクスの標準化のための値の算出
         module2Num = {"other": 0}#id==0: その他
         committer2Num = {"other": 0}#id==0: その他
@@ -319,7 +316,7 @@ class Datasets(torch.utils.data.Dataset):
             "maxInterval" : [],
             "minInterval" : [],
         }
-        if( "codemetrics" in self.selectedInputData):
+        if(cfg.checkCodeMetricsExists()):
             for pathSample4Train in self.pathsSample4Train:
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
                     sampleJson = json.load(fSample4Train)
@@ -327,7 +324,7 @@ class Datasets(torch.utils.data.Dataset):
                         metricsCode[item].append(sampleJson[item])
             for item in map2StandardizeMetricsCode:
                 map2StandardizeMetricsCode[item] = [np.array(metricsCode[item]).mean(), np.std(metricsCode[item])]
-        if( "processmetrics" in self.selectedInputData):
+        if(cfg.checkProcessMetricsExists()):
             for pathSample4Train in self.pathsSample4Train:
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
                     sampleJson = json.load(fSample4Train)
@@ -335,7 +332,7 @@ class Datasets(torch.utils.data.Dataset):
                         metricsProcess[item].append(sampleJson[item])
             for item in map2StandardizeMetricsProcess:
                 map2StandardizeMetricsProcess[item] = [np.array(metricsProcess[item]).mean(), np.std(metricsProcess[item])]
-        if( "commitgraph" in self.selectedInputData or "commitseq" in self.selectedInputData):
+        if(cfg.checkCommitGraphExists() or cfg.checkCommitSeqExists()):
             numOfAllNodes = 0
             intervals = [0]*1000
             churns = [[0]*1000, [0]*1000, [0]*1000]
@@ -408,27 +405,9 @@ class Datasets(torch.utils.data.Dataset):
                     numOfNodesPre = numOfNodesNow
                     index+=1
         for pathSample4Train in self.pathsSample4Train:
-            loadSample(pathSample4Train, self.selectedInputData, self.samples4Train, module2Num, committer2Num, tableInterval, tableChurn, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
+            loadSample(pathSample4Train, self.samples4Train, module2Num, committer2Num, tableInterval, tableChurn, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
         for pathSample4Test in self.pathsSample4Test:
-            loadSample(pathSample4Test, self.selectedInputData, self.samples4Test, module2Num, committer2Num, tableInterval, tableChurn, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
-
-    def standardize(self):
-        features=[[] for i in range(24)]
-        for index in range (24):
-            for row in self.samples4Train:
-                features[index].append(float(row[2][index]))
-            mean=np.array(features[index]).mean()
-            std=np.std(features[index])
-            for row in self.samples4Train:
-                if(not std == 0):
-                    row[2][index]=(float(row[2][index])-mean)/std
-                else:
-                    pass
-            for row in self.samples4Test:
-                if(not std == 0):
-                    row[2][index]=(float(row[2][index])-mean)/std
-                else:
-                    pass
+            loadSample(pathSample4Test, self.samples4Test, module2Num, committer2Num, tableInterval, tableChurn, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
 
     def generateDatasetsTrainValid(self, isCrossValidation = False, numOfSplit = 5):
         samplesBuggy    = []
@@ -457,8 +436,8 @@ class Datasets(torch.utils.data.Dataset):
             dataset4Train.extend(trainBuggy)
             dataset4Train.extend(trainNotBuggy)
             random.shuffle(dataset4Train)#最初に1, 次に0ばっかり並んでしまっている。
-            dataset_train_valid["train"] = dataset4Train
-            dataset_train_valid["valid"] = dataset4Valid
+            dataset_train_valid["train"] = Dataset(dataset4Train)
+            dataset_train_valid["valid"] = Dataset(dataset4Valid)
             self.datasets_Train_Valid.append(dataset_train_valid)
             if(not isCrossValidation):
                 break
@@ -479,9 +458,9 @@ class Datasets(torch.utils.data.Dataset):
         dataset4Train.extend(samplesNotBuggy)
         random.shuffle(dataset4Train)#最初に1, 次に0ばっかり並んでしまうのを防ぐ。
         dataset4Test = self.samples4Test
-        dataset_Train_Test["train"] = dataset4Train
-        dataset_Train_Test["test"] = dataset4Test
-        self.datasets_Train_Test.append(dataset_Train_Test)
+        dataset_Train_Test["train"] = Dataset(dataset4Train)
+        dataset_Train_Test["test"] = Dataset(dataset4Test)
+        self.datasets_Train_Test = dataset_Train_Test
 
     def showSummary(self):
         print(" len(samples4Train): " + str(len(self.samples4Train)))

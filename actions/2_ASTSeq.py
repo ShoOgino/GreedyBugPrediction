@@ -1,7 +1,5 @@
-from src.dataset.datasets import Datasets
-from src.model.model import Model
-from src.result.result4BugPrediction import Result4BugPrediction
 from src.manager import Maneger
+from src.config.cfg import cfg
 
 import os
 import glob
@@ -10,37 +8,24 @@ from multiprocessing import Pool
 from multiprocessing import Process
 import multiprocessing
 
-class Experiment():
-    def __init__(self):
-        self.id = "ASTSeq"
+# cfg(タスクの設定)を更新
+cfg.clear()
+cfg.project                     = "egit"
+cfg.purpose                     = ["searchHyperParameter", "searchParameter", "test"]
+#cfg.purpose                     = ["searchHyperParameter", "searchParameter", "test"]
+cfg.typesInput                  = ["codemetrics", "processmetrics"]#["ast", "astseq", "codemetrics", "commitgraph", "commitseq", "processmetrics"]
+#cfg.typesInput                  = ["astseq", "commitseq"]#["ast", "astseq", "codemetrics", "commitgraph", "commitseq", "processmetrics"]
+cfg.pathsSampleTrain            = [r"C:\Users\login\data\workspace\MLTool\datasets\egit\output\R2_r_train"]
+cfg.pathsSampleTest             = [r"C:\Users\login\data\workspace\MLTool\datasets\egit\output\R2_r_test"]
+cfg.adoptingCrossValidation     = False
+cfg.splitSize4Validation        = 5
+cfg.epochs4EarlyStopping        = 10
+cfg.period4HyperParameterSearch = 60*60*10
+cfg.id                          = "ASTSeq_"+cfg.project
+cfg.pathDirOutput               = os.path.dirname(os.path.dirname(__file__)) + "/results/" + cfg.id
+cfg.pathHyperParameters         = ""#cfg.pathDirOutput + "/hyperparameter.json"
+cfg.pathParameters              = ""
 
-        self.purpose = ["searchHyperParameter", "searchParameter", "test"]
-
-        self.dataset = Datasets()
-        # "ast", "astseq", "codemetrics", "commitgraph", "commitseq", "processmetrics"
-        self.dataset.setInputData(["ast", "astseq", "codemetrics", "commitgraph", "commitseq", "processmetrics"])
-        self.dataset.setPathsSample(
-            [
-                r"C:\Users\login\data\workspace\MLTool\datasets\egit\output\R5_r_train"
-            ],
-            isForTest = False
-        )
-        self.dataset.setPathsSample(
-            [
-                r"C:\Users\login\data\workspace\MLTool\datasets\egit\output\R5_r_test"
-            ], 
-            isForTest = True
-        )
-        self.model = Model()
-        self.model.setIsCrossValidation(False)
-        self.model.setSplitSize4Validation(5)
-        self.model.setPeriod4HyperParameterSearch(60*60*10)
-
-        Result4BugPrediction.clear()
-        Result4BugPrediction.setPathResult(os.path.dirname(os.path.dirname(__file__))+"/results/"+self.id)
-        os.makedirs(Result4BugPrediction.pathResult, exist_ok=True)
-        shutil.copy(__file__, Result4BugPrediction.pathResult)
-
-experiment = Experiment()
+# 実験を実行
 maneger = Maneger()
-maneger.run(experiment)
+maneger.run()
