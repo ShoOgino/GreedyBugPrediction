@@ -23,14 +23,14 @@ class DataManeger(torch.utils.data.Dataset):
         if(isForTest):
             for path in pathsSample:
                 if(os.path.isdir(path)):
-                    pathsSearched = glob.glob(path+"\\**\\*.json", recursive=True)
+                    pathsSearched = glob.glob(path+"/**/*.json", recursive=True)
                     self.pathsSample4Test.extend(pathsSearched)
                 else:
                     self.pathsSample4Test.append(path)
         else:
             for path in pathsSample:
                 if(os.path.isdir(path)):
-                    pathsSearched = glob.glob(path+"\\**\\*.json", recursive=True)
+                    pathsSearched = glob.glob(path+"/**/*.json", recursive=True)
                     self.pathsSample4Train.extend(pathsSearched)
                 else:
                     self.pathsSample4Train.append(path)
