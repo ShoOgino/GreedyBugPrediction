@@ -109,7 +109,6 @@ class Modeler(nn.Module):
                 pass
             if(cfg.checkASTSeqExists()):
                 _, (parametersHiddenBiLSTM, _) = self.componentsNetwork["astseq"]["LSTM"](astseq)
-                # todo １つ目のレイヤーについても隠れ層の値が出力されてしまっている。
                 parametersHiddenBiLSTM = torch.cat(torch.split(parametersHiddenBiLSTM[(hp["astseq_numOfLayers"]-1)*2:], 1), dim=2)
                 #featuresFromASTSeq = self.componentsNetwork["astseq"]["linear"](parametersHiddenBiLSTM)
                 featuresFromASTSeq = parametersHiddenBiLSTM.squeeze()
@@ -118,7 +117,6 @@ class Modeler(nn.Module):
                 pass
             if(cfg.checkCommitSeqExists()):
                 _, (parametersHiddenBiLSTM, _) = self.componentsNetwork["commitseq"]["LSTM"](commitseq)
-                # todo １つ目のレイヤーについても隠れ層の値が出力されてしまっている。
                 parametersHiddenBiLSTM = torch.cat(torch.split(parametersHiddenBiLSTM[(hp["commitseq_numOfLayers"]-1)*2:], 1), dim=2)
                 #featuresFromASTSeq = self.componentsNetwork["astseq"]["linear"](parametersHiddenBiLSTM)
                 featuresFromCommitSeq = parametersHiddenBiLSTM.squeeze()
@@ -332,19 +330,18 @@ class Modeler(nn.Module):
                     hp["commitseq_rateDropout"] = trial.suggest_uniform('commitseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('rateDropout', 0.0, 0.3)
                 if(cfg.checkCodeMetricsExists() and cfg.checkProcessMetricsExists()):
                     hp["metrics_numOfLayers"] = trial.suggest_int('metrics_numOfLayers', 1, 3)
-                    hp["metrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 4, 128)
+                    hp["metrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 10, 100)
                 else:
                     if(cfg.checkCodeMetricsExists()):
                         hp["codemetrics"] = {}
                     if(cfg.checkProcessMetricsExists()):
                         hp["processmetrics"] = {}
-
                 hp["optimizer"] = trial.suggest_categorical('optimizer', ['adam'])
-                hp["lrAdam"] = trial.suggest_loguniform('lrAdam', 1e-6, 1e-3)
+                hp["lrAdam"] = trial.suggest_loguniform('lrAdam', 1e-6, 1e-4)
                 hp["beta1Adam"] = trial.suggest_uniform('beta1Adam', 0.9, 0.9)#trial.suggest_uniform('beta1Adam', 0.9, 1)
                 hp["beta2Adam"] = trial.suggest_uniform('beta2Adam', 0.999, 0.999)#trial.suggest_uniform('beta2Adam', 0.999, 1)
                 hp["epsilonAdam"] = trial.suggest_loguniform('epsilonAdam', 1e-8, 1e-8) #trial.suggest_loguniform('epsilonAdam', 1e-10, 1e-8)
-                hp["sizeBatch"] = trial.suggest_int('sizeBatch', 128, 128) #trial.suggest_int('sizeBatch', 16, 128)
+                hp["sizeBatch"] = trial.suggest_int('sizeBatch', 64, 64) #trial.suggest_int('sizeBatch', 16, 128)
                 dataloader={
                     "train": DataLoader(
                         dataset4Train,
@@ -378,33 +375,35 @@ class Modeler(nn.Module):
                 lossValMin = min(lossesValid)
                 indexValMin = lossesValid.index(lossValMin)
                 indexLast = len(lossesValid)-1
-                index2Forward = indexValMin+2 if indexValMin+2 < indexLast else indexLast
+                index4Forward = indexValMin+4 if indexValMin+4 < indexLast else indexLast
                 score=0
-                for i in range(3):
-                    score += lossesValid[index2Forward-i]
-                score = score / 3
+                for i in range(5):
+                    score += lossesValid[index4Forward-i]
+                score = score / 5
                 scoreAverage += score
             scoreAverage = scoreAverage / len(datasets_Train_Valid)
             #全体のログをloggerで出力
             with open(os.path.join(cfg.pathDirOutput, "logSearchHyperParameter.txt"), mode='a') as f:
                 f.write(str(score)+","+str(trial.datetime_start)+","+str(dict(trial.params, **trial.user_attrs))+'\n')
             return scoreAverage
-        study = optuna.create_study()
-        hp_default = {
-            "astseq_rateDropout": 0.0,
-            "commitseq_rateDropout": 0.0,
-            "lrAdam": 1e-05,
-            "epsilonAdam": 1e-08,
-            "optimizer": "adam",
-            "commitseq_numOfLayers": 2,
-            "commitseq_hiddenSize": 1000,
-            "sizeBatch": 128,
-            "beta2Adam": 0.999,
-            "astseq_numOfLayers": 2,
-            "astseq_hiddenSize": 1000,
-            "beta1Adam": 0.9
-        }
-        study.enqueue_trial(hp_default)
+        print('sqlite:///'+cfg.pathLogSearchHyperParameter if cfg.pathLogSearchHyperParameter != "" else 'sqlite:///'+cfg.pathDirOutput + "/optuna.db")
+        study = optuna.create_study(storage='sqlite:///'+cfg.pathLogSearchHyperParameter if cfg.pathLogSearchHyperParameter != "" else 'sqlite:///'+cfg.pathDirOutput + "/optuna.db", load_if_exists=True)
+        if(len(study.get_trials())==0):
+            hp_default = {
+                "astseq_rateDropout": 0.0,
+                "commitseq_rateDropout": 0.0,
+                "lrAdam": 1e-05,
+                "epsilonAdam": 1e-08,
+                "optimizer": "adam",
+                "commitseq_numOfLayers": 2,
+                "commitseq_hiddenSize": 1000,
+                "sizeBatch": 64,
+                "beta2Adam": 0.999,
+                "astseq_numOfLayers": 2,
+                "astseq_hiddenSize": 1000,
+                "beta1Adam": 0.9
+            }
+            study.enqueue_trial(hp_default)
         study.optimize(objectiveFunction, timeout=cfg.period4HyperParameterSearch)
         #save the hyperparameter that seems to be the best.
         #self.plotGraphHyperParameterSearch(study.get_trials())

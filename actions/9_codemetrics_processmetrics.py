@@ -11,10 +11,11 @@ import datetime
 
 # cfg(タスクの設定)を更新
 cfg.clear()
+cfg.pathConfigFile              = __file__
 cfg.project                     = "egit"
 cfg.release                     = 2
-cfg.purpose                     = ["searchHyperParameter", "searchParameter", "test"]
-cfg.typesInput                  = ["codemetrics", "processmetrics"]#["ast", "astseq", "codemetrics", "commitgraph", "commitseq", "processmetrics"]
+cfg.purpose                     = [cfg.Purpose.searchHyperParameter, cfg.Purpose.searchParameter, cfg.Purpose.test]
+cfg.typesInput                  = [cfg.TypeInput.astseq, cfg.TypeInput.commitseq]
 cfg.pathsSampleTrain            = ["C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_train".format(cfg.project, cfg.release)]
 cfg.pathsSampleTest             = ["C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_test".format(cfg.project, cfg.release)]
 cfg.adoptingCrossValidation     = False
@@ -23,8 +24,6 @@ cfg.epochs4EarlyStopping        = 10
 cfg.period4HyperParameterSearch = 60*60*12
 cfg.id                          = os.path.splitext(os.path.basename(__file__))[0] + "_" + cfg.project + "_" + str(cfg.release)
 cfg.pathDirOutput               = os.path.dirname(os.path.dirname(__file__)) + "/results/" + cfg.id + "_"+str(datetime.datetime.today().strftime("%Y%m%d_%H%M%S"))
-cfg.pathHyperParameters         = cfg.pathDirOutput + "/hyperparameter.json"
-cfg.pathParameters              = ""
 
 # 実験を実行
 maneger = Maneger()

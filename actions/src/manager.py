@@ -13,7 +13,7 @@ class Maneger:
         # 実験結果フォルダを作成
         os.makedirs(cfg.pathDirOutput, exist_ok=True)
         # 実験結果フォルダへ実行環境情報を保存
-        shutil.copy(__file__, cfg.pathDirOutput)
+        shutil.copy(cfg.pathConfigFile, cfg.pathDirOutput)
 
         # データ職人生成
         dataManeger = DataManeger()
