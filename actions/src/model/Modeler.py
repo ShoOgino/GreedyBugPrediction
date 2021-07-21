@@ -319,18 +319,18 @@ class Modeler(nn.Module):
                 if(cfg.checkASTExists()):
                     pass
                 if(cfg.checkASTSeqExists()):
-                    hp["astseq_numOfLayers"] = trial.suggest_int('astseq_numOfLayers', 1, 2)
-                    hp["astseq_hiddenSize"] = trial.suggest_int('astseq_hiddenSize', 10, 1000)
+                    hp["astseq_numOfLayers"] = trial.suggest_int('astseq_numOfLayers', 1, 3)
+                    hp["astseq_hiddenSize"] = trial.suggest_int('astseq_hiddenSize', 16, 256)
                     hp["astseq_rateDropout"] = trial.suggest_uniform('astseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('astseq_rateDropout', 0.0, 0.3)
                 if(cfg.checkCommitGraphExists()):
                     pass
                 if(cfg.checkCommitSeqExists()):
-                    hp["commitseq_numOfLayers"] = trial.suggest_int('commitseq_numOfLayers', 1, 2)
-                    hp["commitseq_hiddenSize"] = trial.suggest_int('commitseq_hiddenSize', 10, 1000)
+                    hp["commitseq_numOfLayers"] = trial.suggest_int('commitseq_numOfLayers', 1, 3)
+                    hp["commitseq_hiddenSize"] = trial.suggest_int('commitseq_hiddenSize', 16, 256)
                     hp["commitseq_rateDropout"] = trial.suggest_uniform('commitseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('rateDropout', 0.0, 0.3)
                 if(cfg.checkCodeMetricsExists() and cfg.checkProcessMetricsExists()):
                     hp["metrics_numOfLayers"] = trial.suggest_int('metrics_numOfLayers', 1, 3)
-                    hp["metrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 10, 100)
+                    hp["metrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 16, 128)
                 else:
                     if(cfg.checkCodeMetricsExists()):
                         hp["codemetrics"] = {}
@@ -396,11 +396,11 @@ class Modeler(nn.Module):
                 "epsilonAdam": 1e-08,
                 "optimizer": "adam",
                 "commitseq_numOfLayers": 2,
-                "commitseq_hiddenSize": 1000,
+                "commitseq_hiddenSize": 128,
                 "sizeBatch": 64,
                 "beta2Adam": 0.999,
                 "astseq_numOfLayers": 2,
-                "astseq_hiddenSize": 1000,
+                "astseq_hiddenSize": 128,
                 "beta1Adam": 0.9
             }
             study.enqueue_trial(hp_default)
