@@ -341,7 +341,7 @@ class Modeler(nn.Module):
                 hp["beta1Adam"] = trial.suggest_uniform('beta1Adam', 0.9, 0.9)#trial.suggest_uniform('beta1Adam', 0.9, 1)
                 hp["beta2Adam"] = trial.suggest_uniform('beta2Adam', 0.999, 0.999)#trial.suggest_uniform('beta2Adam', 0.999, 1)
                 hp["epsilonAdam"] = trial.suggest_loguniform('epsilonAdam', 1e-8, 1e-8) #trial.suggest_loguniform('epsilonAdam', 1e-10, 1e-8)
-                hp["sizeBatch"] = trial.suggest_int('sizeBatch', 64, 64) #trial.suggest_int('sizeBatch', 16, 128)
+                hp["sizeBatch"] = trial.suggest_int('sizeBatch', 128, 128) #trial.suggest_int('sizeBatch', 16, 128)
                 dataloader={
                     "train": DataLoader(
                         dataset4Train,
@@ -399,7 +399,7 @@ class Modeler(nn.Module):
                     "commitseq_rateDropout": 0.0,
                     "metrics_numOfLayers": 2,
                     "metrics_numOfOutput": 64,
-                    "sizeBatch": 64,
+                    "sizeBatch": 128,
                     "optimizer": "adam",
                     "lrAdam": 1e-05,
                     "beta1Adam": 0.9,
@@ -414,7 +414,7 @@ class Modeler(nn.Module):
                     "commitseq_numOfLayers": 2,
                     "commitseq_hiddenSize": 128,
                     "commitseq_rateDropout": 0.0,
-                    "sizeBatch": 64,
+                    "sizeBatch": 128,
                     "optimizer": "adam",
                     "lrAdam": 1e-05,
                     "beta1Adam": 0.9,
@@ -425,7 +425,7 @@ class Modeler(nn.Module):
                 hp_default = {
                     "metrics_numOfLayers": 2,
                     "metrics_numOfOutput": 64,
-                    "sizeBatch": 64,
+                    "sizeBatch": 128,
                     "optimizer": "adam",
                     "lrAdam": 1e-05,
                     "beta1Adam": 0.9,
