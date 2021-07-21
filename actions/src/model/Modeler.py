@@ -389,7 +389,7 @@ class Modeler(nn.Module):
         print('sqlite:///'+cfg.pathLogSearchHyperParameter if cfg.pathLogSearchHyperParameter != "" else 'sqlite:///'+cfg.pathDirOutput + "/optuna.db")
         study = optuna.create_study(storage='sqlite:///'+cfg.pathLogSearchHyperParameter if cfg.pathLogSearchHyperParameter != "" else 'sqlite:///'+cfg.pathDirOutput + "/optuna.db", load_if_exists=True)
         if(len(study.get_trials())==0):
-            if(cfg.checkCommitSeqExists() & cfg.checkASTSeqExists() & cfg.checkCodeMetricsExists & cfg.checkProcessMetricsExists()):
+            if(cfg.checkCommitSeqExists() & cfg.checkASTSeqExists() & cfg.checkCodeMetricsExists() & cfg.checkProcessMetricsExists()):
                 hp_default = {
                     "astseq_numOfLayers": 2,
                     "astseq_hiddenSize": 128,
