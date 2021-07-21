@@ -389,20 +389,49 @@ class Modeler(nn.Module):
         print('sqlite:///'+cfg.pathLogSearchHyperParameter if cfg.pathLogSearchHyperParameter != "" else 'sqlite:///'+cfg.pathDirOutput + "/optuna.db")
         study = optuna.create_study(storage='sqlite:///'+cfg.pathLogSearchHyperParameter if cfg.pathLogSearchHyperParameter != "" else 'sqlite:///'+cfg.pathDirOutput + "/optuna.db", load_if_exists=True)
         if(len(study.get_trials())==0):
-            hp_default = {
-                "astseq_rateDropout": 0.0,
-                "commitseq_rateDropout": 0.0,
-                "lrAdam": 1e-05,
-                "epsilonAdam": 1e-08,
-                "optimizer": "adam",
-                "commitseq_numOfLayers": 2,
-                "commitseq_hiddenSize": 128,
-                "sizeBatch": 64,
-                "beta2Adam": 0.999,
-                "astseq_numOfLayers": 2,
-                "astseq_hiddenSize": 128,
-                "beta1Adam": 0.9
-            }
+            if(cfg.checkCommitSeqExists() & cfg.checkASTSeqExists() & cfg.checkCodeMetricsExists & cfg.checkProcessMetricsExists()):
+                hp_default = {
+                    "astseq_numOfLayers": 2,
+                    "astseq_hiddenSize": 128,
+                    "astseq_rateDropout": 0.0,
+                    "commitseq_numOfLayers": 2,
+                    "commitseq_hiddenSize": 128,
+                    "commitseq_rateDropout": 0.0,
+                    "metrics_numOfLayers": 2,
+                    "metrics_numOfOutput": 64,
+                    "sizeBatch": 64,
+                    "optimizer": "adam",
+                    "lrAdam": 1e-05,
+                    "beta1Adam": 0.9,
+                    "beta2Adam": 0.999,
+                    "epsilonAdam": 1e-08
+                }
+            elif(cfg.checkCommitSeqExists() & cfg.checkASTSeqExists()):
+                hp_default = {
+                    "astseq_numOfLayers": 2,
+                    "astseq_hiddenSize": 128,
+                    "astseq_rateDropout": 0.0,
+                    "commitseq_numOfLayers": 2,
+                    "commitseq_hiddenSize": 128,
+                    "commitseq_rateDropout": 0.0,
+                    "sizeBatch": 64,
+                    "optimizer": "adam",
+                    "lrAdam": 1e-05,
+                    "beta1Adam": 0.9,
+                    "beta2Adam": 0.999,
+                    "epsilonAdam": 1e-08
+                }
+            elif(cfg.checkCodeMetricsExists() & cfg.checkProcessMetricsExists()):
+                hp_default = {
+                    "metrics_numOfLayers": 2,
+                    "metrics_numOfOutput": 64,
+                    "sizeBatch": 64,
+                    "optimizer": "adam",
+                    "lrAdam": 1e-05,
+                    "beta1Adam": 0.9,
+                    "beta2Adam": 0.999,
+                    "epsilonAdam": 1e-08
+                }
             study.enqueue_trial(hp_default)
         study.optimize(objectiveFunction, timeout=cfg.period4HyperParameterSearch)
         #save the hyperparameter that seems to be the best.
