@@ -383,11 +383,10 @@ class Modeler(nn.Module):
                 scoreAverage += score
             scoreAverage = scoreAverage / len(datasets_Train_Valid)
             #全体のログをloggerで出力
-            with open(os.path.join(cfg.pathDirOutput, "logSearchHyperParameter.txt"), mode='a') as f:
-                f.write(str(score)+","+str(trial.datetime_start)+","+str(dict(trial.params, **trial.user_attrs))+'\n')
+            #with open(os.path.join(cfg.pathDirOutput, "logSearchHyperParameter.txt"), mode='a') as f:
+            #    f.write(str(score)+","+str(trial.datetime_start)+","+str(dict(trial.params, **trial.user_attrs))+'\n')
             return scoreAverage
-        print('sqlite:///'+cfg.pathLogSearchHyperParameter if cfg.pathLogSearchHyperParameter != "" else 'sqlite:///'+cfg.pathDirOutput + "/optuna.db")
-        study = optuna.create_study(storage='sqlite:///'+cfg.pathLogSearchHyperParameter if cfg.pathLogSearchHyperParameter != "" else 'sqlite:///'+cfg.pathDirOutput + "/optuna.db", load_if_exists=True)
+        study = optuna.create_study(study_name="optuna", storage='sqlite:///'+cfg.pathDirOutput + "/optuna.db", load_if_exists=True)
         if(len(study.get_trials())==0):
             if(cfg.checkCommitSeqExists() & cfg.checkASTSeqExists() & cfg.checkCodeMetricsExists() & cfg.checkProcessMetricsExists()):
                 hp_default = {

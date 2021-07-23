@@ -14,8 +14,7 @@ cfg.clear()
 cfg.pathConfigFile              = os.path.abspath(__file__)
 cfg.project                     = "cassandra"
 cfg.release                     = 2
-#cfg.purpose                     = [cfg.Purpose.searchHyperParameter, cfg.Purpose.searchParameter, cfg.Purpose.test]
-cfg.purpose                     = [cfg.Purpose.searchParameter, cfg.Purpose.test]
+cfg.purpose                     = [cfg.Purpose.searchHyperParameter, cfg.Purpose.searchParameter, cfg.Purpose.test]
 cfg.typesInput                  = [cfg.TypeInput.codemetrics, cfg.TypeInput.processmetrics]
 cfg.pathsSampleTrain            = ["C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_train".format(cfg.project, cfg.release)]
 cfg.pathsSampleTest             = ["C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_test".format(cfg.project, cfg.release)]

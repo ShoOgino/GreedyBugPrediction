@@ -21,7 +21,7 @@ cfg.pathsSampleTest             = ["C:/Users/login/data/workspace/MLTool/dataset
 cfg.adoptingCrossValidation     = False
 cfg.splitSize4Validation        = 5
 cfg.epochs4EarlyStopping        = 10
-cfg.period4HyperParameterSearch = 60*60*24
+cfg.period4HyperParameterSearch = 60*60*20
 cfg.id                          = os.path.splitext(os.path.basename(cfg.pathConfigFile))[0] + "_" + cfg.project + "_" + str(cfg.release)
 cfg.pathDirOutput               = os.path.dirname(os.path.dirname(cfg.pathConfigFile)) + "/results/" + cfg.id + "_"+str(datetime.datetime.today().strftime("%Y%m%d_%H%M%S"))
 
