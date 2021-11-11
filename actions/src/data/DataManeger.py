@@ -102,7 +102,7 @@ class DataManeger(torch.utils.data.Dataset):
                             (float(sampleJson["complexity"])-map2StandardizeMetricsCode["complexity"][0]) / map2StandardizeMetricsCode["complexity"][1],
                             (float(sampleJson["execStmt"])-map2StandardizeMetricsCode["execStmt"][0]) / map2StandardizeMetricsCode["execStmt"][1],
                             (float(sampleJson["maxNesting"])-map2StandardizeMetricsCode["maxNesting"][0]) / map2StandardizeMetricsCode["maxNesting"][1],
-                            (float(sampleJson["loc"])-map2StandardizeMetricsCode["loc"][0]) / map2StandardizeMetricsCode["loc"][1],
+#                            (float(sampleJson["loc"])-map2StandardizeMetricsCode["loc"][0]) / map2StandardizeMetricsCode["loc"][1],
                         ]
                     )
                 if(cfg.checkCommitGraphExists()):
@@ -207,19 +207,19 @@ class DataManeger(torch.utils.data.Dataset):
                             (float(sampleJson["cond"])-map2StandardizeMetricsProcess["cond"][0]) / map2StandardizeMetricsProcess["cond"][1],
                             (float(sampleJson["elseAdded"])-map2StandardizeMetricsProcess["elseAdded"][0]) / map2StandardizeMetricsProcess["elseAdded"][1],
                             (float(sampleJson["elseDeleted"])-map2StandardizeMetricsProcess["elseDeleted"][0]) / map2StandardizeMetricsProcess["elseDeleted"][1],
-                            (float(sampleJson["addLOC"])-map2StandardizeMetricsProcess["addLOC"][0]) / map2StandardizeMetricsProcess["addLOC"][1],
-                            (float(sampleJson["delLOC"])-map2StandardizeMetricsProcess["delLOC"][0]) / map2StandardizeMetricsProcess["delLOC"][1],
-                            (float(sampleJson["devMinor"])-map2StandardizeMetricsProcess["devMinor"][0]) / map2StandardizeMetricsProcess["devMinor"][1],
-                            (float(sampleJson["devMajor"])-map2StandardizeMetricsProcess["devMajor"][0]) / map2StandardizeMetricsProcess["devMajor"][1],
-                            (float(sampleJson["ownership"])-map2StandardizeMetricsProcess["ownership"][0]) / map2StandardizeMetricsProcess["ownership"][1],
-                            (float(sampleJson["fixChgNum"])-map2StandardizeMetricsProcess["fixChgNum"][0]) / map2StandardizeMetricsProcess["fixChgNum"][1],
-                            (float(sampleJson["pastBugNum"])-map2StandardizeMetricsProcess["pastBugNum"][0]) / map2StandardizeMetricsProcess["pastBugNum"][1],
-                            (float(sampleJson["bugIntroNum"])-map2StandardizeMetricsProcess["bugIntroNum"][0]) / map2StandardizeMetricsProcess["bugIntroNum"][1],
-                            (float(sampleJson["logCoupNum"])-map2StandardizeMetricsProcess["logCoupNum"][0]) / map2StandardizeMetricsProcess["logCoupNum"][1],
-                            (float(sampleJson["period"])-map2StandardizeMetricsProcess["period"][0]) / map2StandardizeMetricsProcess["period"][1],
-                            (float(sampleJson["avgInterval"])-map2StandardizeMetricsProcess["avgInterval"][0]) / map2StandardizeMetricsProcess["avgInterval"][1],
-                            (float(sampleJson["maxInterval"])-map2StandardizeMetricsProcess["maxInterval"][0]) / map2StandardizeMetricsProcess["maxInterval"][1],
-                            (float(sampleJson["minInterval"])-map2StandardizeMetricsProcess["minInterval"][0]) / map2StandardizeMetricsProcess["minInterval"][1],
+#                            (float(sampleJson["addLOC"])-map2StandardizeMetricsProcess["addLOC"][0]) / map2StandardizeMetricsProcess["addLOC"][1],
+#                            (float(sampleJson["delLOC"])-map2StandardizeMetricsProcess["delLOC"][0]) / map2StandardizeMetricsProcess["delLOC"][1],
+#                            (float(sampleJson["devMinor"])-map2StandardizeMetricsProcess["devMinor"][0]) / map2StandardizeMetricsProcess["devMinor"][1],
+#                            (float(sampleJson["devMajor"])-map2StandardizeMetricsProcess["devMajor"][0]) / map2StandardizeMetricsProcess["devMajor"][1],
+#                            (float(sampleJson["ownership"])-map2StandardizeMetricsProcess["ownership"][0]) / map2StandardizeMetricsProcess["ownership"][1],
+#                            (float(sampleJson["fixChgNum"])-map2StandardizeMetricsProcess["fixChgNum"][0]) / map2StandardizeMetricsProcess["fixChgNum"][1],
+#                            (float(sampleJson["pastBugNum"])-map2StandardizeMetricsProcess["pastBugNum"][0]) / map2StandardizeMetricsProcess["pastBugNum"][1],
+#                            (float(sampleJson["bugIntroNum"])-map2StandardizeMetricsProcess["bugIntroNum"][0]) / map2StandardizeMetricsProcess["bugIntroNum"][1],
+#                            (float(sampleJson["logCoupNum"])-map2StandardizeMetricsProcess["logCoupNum"][0]) / map2StandardizeMetricsProcess["logCoupNum"][1],
+#                            (float(sampleJson["period"])-map2StandardizeMetricsProcess["period"][0]) / map2StandardizeMetricsProcess["period"][1],
+#                            (float(sampleJson["avgInterval"])-map2StandardizeMetricsProcess["avgInterval"][0]) / map2StandardizeMetricsProcess["avgInterval"][1],
+#                            (float(sampleJson["maxInterval"])-map2StandardizeMetricsProcess["maxInterval"][0]) / map2StandardizeMetricsProcess["maxInterval"][1],
+#                            (float(sampleJson["minInterval"])-map2StandardizeMetricsProcess["minInterval"][0]) / map2StandardizeMetricsProcess["minInterval"][1],
                         ]
                     )
             listSamples.append(sample)

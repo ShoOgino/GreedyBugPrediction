@@ -18,7 +18,6 @@ class Maneger:
         if(cfg.pathLogSearchHyperParameter!=""):
             shutil.copy(cfg.pathLogSearchHyperParameter, cfg.pathDirOutput)
 
-
         # データ職人生成
         dataManeger = DataManeger()
         dataManeger.setPathsSample(cfg.pathsSampleTrain, False)
