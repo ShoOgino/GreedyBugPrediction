@@ -1,0 +1,15 @@
+{
+    "commitseq_hiddenSize": 41,
+    "beta1Adam": 0.9,
+    "astseq_hiddenSize": 238,
+    "commitseq_numOfLayers": 3,
+    "commitseq_rateDropout": 0.0,
+    "sizeBatch": 128,
+    "epsilonAdam": 1e-08,
+    "lrAdam": 2.743586464332033e-06,
+    "astseq_numOfLayers": 3,
+    "optimizer": "adam",
+    "numEpochs": 200,
+    "astseq_rateDropout": 0.0,
+    "beta2Adam": 0.999
+}

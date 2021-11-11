@@ -1,0 +1,1 @@
+{"metrics_numOfLayers": 2, "metrics_numOfOutput": 81, "optimizer": "adam", "lrAdam": 1.9535020303281164e-06, "beta1Adam": 0.9, "beta2Adam": 0.999, "epsilonAdam": 1e-08, "sizeBatch": 128, "numEpochs": 335}

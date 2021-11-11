@@ -1,0 +1,11 @@
+{
+    "lrAdam": 2.8991727282576737e-05,
+    "beta1Adam": 0.9,
+    "epsilonAdam": 1e-08,
+    "sizeBatch": 128,
+    "beta2Adam": 0.999,
+    "metrics_numOfOutput": 53,
+    "numEpochs": 61,
+    "optimizer": "adam",
+    "metrics_numOfLayers": 1
+}

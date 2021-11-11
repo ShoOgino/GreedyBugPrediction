@@ -12,7 +12,7 @@ import datetime
 # cfg(タスクの設定)を更新
 cfg.clear()
 cfg.pathConfigFile              = os.path.abspath(__file__)
-cfg.project                     = "cassandra"
+cfg.project                     = "egit"
 cfg.release                     = 2
 cfg.purpose                     = [cfg.Purpose.searchHyperParameter, cfg.Purpose.searchParameter, cfg.Purpose.test]
 cfg.typesInput                  = [cfg.TypeInput.codemetrics, cfg.TypeInput.processmetrics]
