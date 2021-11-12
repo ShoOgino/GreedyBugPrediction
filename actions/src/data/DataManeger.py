@@ -170,19 +170,19 @@ class DataManeger(torch.utils.data.Dataset):
                         [
                             (float(sampleJson["commitGraph"]["moduleHistories"])-map2StandardizeMetricsProcess["moduleHistories"][0]) / map2StandardizeMetricsProcess["moduleHistories"][1],
                             (float(sampleJson["commitGraph"]["authors"])-map2StandardizeMetricsProcess["authors"][0]) / map2StandardizeMetricsProcess["authors"][1],
-                            (float(sampleJson["commitGraph"]["stmtAdded"])-map2StandardizeMetricsProcess["stmtAdded"][0]) / map2StandardizeMetricsProcess["stmtAdded"][1],
+                            (float(sampleJson["commitGraph"]["sumStmtAdded"])-map2StandardizeMetricsProcess["sumStmtAdded"][0]) / map2StandardizeMetricsProcess["sumStmtAdded"][1],
                             (float(sampleJson["commitGraph"]["maxStmtAdded"])-map2StandardizeMetricsProcess["maxStmtAdded"][0]) / map2StandardizeMetricsProcess["maxStmtAdded"][1],
                             (float(sampleJson["commitGraph"]["avgStmtAdded"])-map2StandardizeMetricsProcess["avgStmtAdded"][0]) / map2StandardizeMetricsProcess["avgStmtAdded"][1],
-                            (float(sampleJson["commitGraph"]["stmtDeleted"])-map2StandardizeMetricsProcess["stmtDeleted"][0]) / map2StandardizeMetricsProcess["stmtDeleted"][1],
+                            (float(sampleJson["commitGraph"]["sumStmtDeleted"])-map2StandardizeMetricsProcess["sumStmtDeleted"][0]) / map2StandardizeMetricsProcess["sumStmtDeleted"][1],
                             (float(sampleJson["commitGraph"]["maxStmtDeleted"])-map2StandardizeMetricsProcess["maxStmtDeleted"][0]) / map2StandardizeMetricsProcess["maxStmtDeleted"][1],
                             (float(sampleJson["commitGraph"]["avgStmtDeleted"])-map2StandardizeMetricsProcess["avgStmtDeleted"][0]) / map2StandardizeMetricsProcess["avgStmtDeleted"][1],
-                            (float(sampleJson["commitGraph"]["churn"])-map2StandardizeMetricsProcess["churn"][0]) / map2StandardizeMetricsProcess["churn"][1],
+                            (float(sampleJson["commitGraph"]["sumChurn"])-map2StandardizeMetricsProcess["sumChurn"][0]) / map2StandardizeMetricsProcess["sumChurn"][1],
                             (float(sampleJson["commitGraph"]["maxChurn"])-map2StandardizeMetricsProcess["maxChurn"][0]) / map2StandardizeMetricsProcess["maxChurn"][1],
                             (float(sampleJson["commitGraph"]["avgChurn"])-map2StandardizeMetricsProcess["avgChurn"][0]) / map2StandardizeMetricsProcess["avgChurn"][1],
-                            (float(sampleJson["commitGraph"]["decl"])-map2StandardizeMetricsProcess["decl"][0]) / map2StandardizeMetricsProcess["decl"][1],
-                            (float(sampleJson["commitGraph"]["cond"])-map2StandardizeMetricsProcess["cond"][0]) / map2StandardizeMetricsProcess["cond"][1],
-                            (float(sampleJson["commitGraph"]["elseAdded"])-map2StandardizeMetricsProcess["elseAdded"][0]) / map2StandardizeMetricsProcess["elseAdded"][1],
-                            (float(sampleJson["commitGraph"]["elseDeleted"])-map2StandardizeMetricsProcess["elseDeleted"][0]) / map2StandardizeMetricsProcess["elseDeleted"][1]
+                            (float(sampleJson["commitGraph"]["sumDecl"])-map2StandardizeMetricsProcess["sumDecl"][0]) / map2StandardizeMetricsProcess["sumDecl"][1],
+                            (float(sampleJson["commitGraph"]["sumCond"])-map2StandardizeMetricsProcess["sumCond"][0]) / map2StandardizeMetricsProcess["sumCond"][1],
+                            (float(sampleJson["commitGraph"]["sumElseAdded"])-map2StandardizeMetricsProcess["sumElseAdded"][0]) / map2StandardizeMetricsProcess["sumElseAdded"][1],
+                            (float(sampleJson["commitGraph"]["sumElseDeleted"])-map2StandardizeMetricsProcess["sumElseDeleted"][0]) / map2StandardizeMetricsProcess["sumElseDeleted"][1]
                         ]
                     )
             listSamples.append(sample)
@@ -209,19 +209,19 @@ class DataManeger(torch.utils.data.Dataset):
         metricsProcess = {
             "moduleHistories" : [],
             "authors" : [],
-            "stmtAdded" : [],
+            "sumStmtAdded" : [],
             "maxStmtAdded" : [],
             "avgStmtAdded" : [],
-            "stmtDeleted" : [],
+            "sumStmtDeleted" : [],
             "maxStmtDeleted" : [],
             "avgStmtDeleted" : [],
-            "churn" : [],
+            "sumChurn" : [],
             "maxChurn" : [],
             "avgChurn" : [],
-            "decl" : [],
-            "cond" : [],
-            "elseAdded" : [],
-            "elseDeleted" : [],
+            "sumDecl" : [],
+            "sumCond" : [],
+            "sumElseAdded" : [],
+            "sumElseDeleted" : [],
         }
         map2StandardizeMetricsCommit = {
             "stmtAdded": [],
@@ -246,19 +246,19 @@ class DataManeger(torch.utils.data.Dataset):
         map2StandardizeMetricsProcess = {
             "moduleHistories" : [],
             "authors" : [],
-            "stmtAdded" : [],
+            "sumStmtAdded" : [],
             "maxStmtAdded" : [],
             "avgStmtAdded" : [],
-            "stmtDeleted" : [],
+            "sumStmtDeleted" : [],
             "maxStmtDeleted" : [],
             "avgStmtDeleted" : [],
-            "churn" : [],
+            "sumChurn" : [],
             "maxChurn" : [],
             "avgChurn" : [],
-            "decl" : [],
-            "cond" : [],
-            "elseAdded" : [],
-            "elseDeleted" : [],
+            "sumDecl" : [],
+            "sumCond" : [],
+            "sumElseAdded" : [],
+            "sumElseDeleted" : [],
         }
         if(cfg.checkCommitSeqExists()):
             for pathSample4Train in self.pathsSample4Train:
@@ -282,7 +282,7 @@ class DataManeger(torch.utils.data.Dataset):
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
                     sampleJson = json.load(fSample4Train)
                     for item in metricsProcess:
-                        metricsProcess[item].append(sampleJson[item])
+                        metricsProcess[item].append(sampleJson["commitGraph"][item])
             for item in map2StandardizeMetricsProcess:
                 map2StandardizeMetricsProcess[item] = [np.array(metricsProcess[item]).mean(), np.std(metricsProcess[item])]
         for pathSample4Train in self.pathsSample4Train:

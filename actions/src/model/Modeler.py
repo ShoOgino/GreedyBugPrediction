@@ -84,7 +84,7 @@ class Modeler(nn.Module):
             else:
                 numOfFeatures_commitseq = hp["commitseq_hiddenSize"]
             numOfFeatures += numOfFeatures_commitseq
-        if(cfg.checkCodeMetricsExists() and cfg.checkProcessMetricsExists()):
+        if(cfg.checkCodeMetricsExists() or cfg.checkProcessMetricsExists()):
             numOfFeaturesMetrics = len(dataset.codemetricss[0])+len(dataset.processmetricss[0])
             for i in range(hp["metrics_numOfLayers"]):
                 if( i == 0 ):
@@ -123,6 +123,11 @@ class Modeler(nn.Module):
                 features.append(featuresFromCommitSeq)
             if(cfg.checkCodeMetricsExists() and cfg.checkProcessMetricsExists()):
                 featuresFromMetrics = torch.cat([codemetrics, processmetrics], dim=1)
+                for i in range(hp["metrics_numOfLayers"]):
+                    featuresFromMetrics = self.componentsNetwork["codemetrics"]["linear"+str(i)](featuresFromMetrics)#todo codemetricsだけ？
+                features.append(featuresFromMetrics)
+            elif(cfg.checkProcessMetricsExists()):
+                featuresFromMetrics = processmetrics
                 for i in range(hp["metrics_numOfLayers"]):
                     featuresFromMetrics = self.componentsNetwork["codemetrics"]["linear"+str(i)](featuresFromMetrics)
                 features.append(featuresFromMetrics)
@@ -328,7 +333,7 @@ class Modeler(nn.Module):
                     hp["commitseq_numOfLayers"] = trial.suggest_int('commitseq_numOfLayers', 1, 3)
                     hp["commitseq_hiddenSize"] = trial.suggest_int('commitseq_hiddenSize', 16, 256)
                     hp["commitseq_rateDropout"] = trial.suggest_uniform('commitseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('rateDropout', 0.0, 0.3)
-                if(cfg.checkCodeMetricsExists() and cfg.checkProcessMetricsExists()):
+                if(cfg.checkCodeMetricsExists() or cfg.checkProcessMetricsExists()):
                     hp["metrics_numOfLayers"] = trial.suggest_int('metrics_numOfLayers', 1, 3)
                     hp["metrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 16, 128)
                 else:
@@ -436,6 +441,17 @@ class Modeler(nn.Module):
                     "commitseq_numOfLayers": 2,
                     "commitseq_hiddenSize": 128,
                     "commitseq_rateDropout": 0.0,
+                    "sizeBatch": 128,
+                    "optimizer": "adam",
+                    "lrAdam": 1e-05,
+                    "beta1Adam": 0.9,
+                    "beta2Adam": 0.999,
+                    "epsilonAdam": 1e-08
+                }
+            elif(cfg.checkProcessMetricsExists()):
+                hp_default = {
+                    "metrics_numOfLayers": 2,
+                    "metrics_numOfOutput": 64,
                     "sizeBatch": 128,
                     "optimizer": "adam",
                     "lrAdam": 1e-05,
