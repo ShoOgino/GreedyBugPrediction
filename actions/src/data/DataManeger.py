@@ -46,7 +46,7 @@ class DataManeger(torch.utils.data.Dataset):
             vectorOnehot = [0] * 99
             vectorOnehot[numType]=1
             return vectorOnehot
-        def loadSample(pathSample, listSamples, module2Num, committer2Num, tableInterval, tableChurn, map2StandardizeMetricsCode, map2StandardizeMetricsProcess):
+        def loadSample(pathSample, listSamples, map2StandardizeMetricsCommit, map2StandardizeMetricsCode, map2StandardizeMetricsProcess):
             sample = {}
             with open(pathSample, encoding="utf-8") as fSample4Train:
                 sampleJson = json.load(fSample4Train)
@@ -93,16 +93,15 @@ class DataManeger(torch.utils.data.Dataset):
                 if(cfg.checkCodeMetricsExists()):
                     sample["x"]["codemetrics"].extend(
                         [
-                            (float(sampleJson["fanIn"])-map2StandardizeMetricsCode["fanIn"][0]) / map2StandardizeMetricsCode["fanIn"][1],
-                            (float(sampleJson["fanOut"])-map2StandardizeMetricsCode["fanOut"][0]) / map2StandardizeMetricsCode["fanOut"][1],
-                            (float(sampleJson["parameters"])-map2StandardizeMetricsCode["parameters"][0]) / map2StandardizeMetricsCode["parameters"][1],
-                            (float(sampleJson["localVar"])-map2StandardizeMetricsCode["localVar"][0]) / map2StandardizeMetricsCode["localVar"][1],
-                            (float(sampleJson["commentRatio"])-map2StandardizeMetricsCode["commentRatio"][0]) / map2StandardizeMetricsCode["commentRatio"][1],
-                            (float(sampleJson["countPath"])-map2StandardizeMetricsCode["countPath"][0]) / map2StandardizeMetricsCode["countPath"][1],
-                            (float(sampleJson["complexity"])-map2StandardizeMetricsCode["complexity"][0]) / map2StandardizeMetricsCode["complexity"][1],
-                            (float(sampleJson["execStmt"])-map2StandardizeMetricsCode["execStmt"][0]) / map2StandardizeMetricsCode["execStmt"][1],
-                            (float(sampleJson["maxNesting"])-map2StandardizeMetricsCode["maxNesting"][0]) / map2StandardizeMetricsCode["maxNesting"][1],
-#                            (float(sampleJson["loc"])-map2StandardizeMetricsCode["loc"][0]) / map2StandardizeMetricsCode["loc"][1],
+                            (float(sampleJson["sourcecode"]["fanIn"])-map2StandardizeMetricsCode["fanIn"][0]) / map2StandardizeMetricsCode["fanIn"][1],
+                            (float(sampleJson["sourcecode"]["fanOut"])-map2StandardizeMetricsCode["fanOut"][0]) / map2StandardizeMetricsCode["fanOut"][1],
+                            (float(sampleJson["sourcecode"]["parameters"])-map2StandardizeMetricsCode["parameters"][0]) / map2StandardizeMetricsCode["parameters"][1],
+                            (float(sampleJson["sourcecode"]["localVar"])-map2StandardizeMetricsCode["localVar"][0]) / map2StandardizeMetricsCode["localVar"][1],
+                            (float(sampleJson["sourcecode"]["commentRatio"])-map2StandardizeMetricsCode["commentRatio"][0]) / map2StandardizeMetricsCode["commentRatio"][1],
+                            (float(sampleJson["sourcecode"]["countPath"])-map2StandardizeMetricsCode["countPath"][0]) / map2StandardizeMetricsCode["countPath"][1],
+                            (float(sampleJson["sourcecode"]["complexity"])-map2StandardizeMetricsCode["complexity"][0]) / map2StandardizeMetricsCode["complexity"][1],
+                            (float(sampleJson["sourcecode"]["execStmt"])-map2StandardizeMetricsCode["execStmt"][0]) / map2StandardizeMetricsCode["execStmt"][1],
+                            (float(sampleJson["sourcecode"]["maxNesting"])-map2StandardizeMetricsCode["maxNesting"][0]) / map2StandardizeMetricsCode["maxNesting"][1]
                         ]
                     )
                 if(cfg.checkCommitGraphExists()):
@@ -149,89 +148,53 @@ class DataManeger(torch.utils.data.Dataset):
                         for numParent in node["parents"]:
                             sample["x"]["commitgraph"]["edges"].append([node["num"], numParent])
                 if(cfg.checkCommitSeqExists()):
-                    numOfCommits = len(sampleJson["commitGraph"])
+                    commits = []
+                    for commit in sampleJson["commitGraph"]["modifications"].values():
+                        if(not commit["isMerge"]):
+                            commits.append(commit)
+                    commits = sorted(commits, key=lambda x: x['date'])
+                    numOfCommits = len(commits)
                     sample["x"]["commitseq"] = [None] * numOfCommits
                     for i in range(numOfCommits):
-                        node = sampleJson["commitGraph"][i]
-                        vector = [
-                            [],
-                            [0] * len(committer2Num),
-                            [0] * 2,
-                            [0] * 50,
-                            [[0] * 50 for i in range(3)],
-                            [0] * len(module2Num)
+                        sample["x"]["commitseq"][i] = [
+                            (float(commits[i]["stmtAdded"])-map2StandardizeMetricsCommit["stmtAdded"][0])/map2StandardizeMetricsCommit["stmtAdded"][1],
+                            (float(commits[i]["stmtDeleted"])-map2StandardizeMetricsCommit["stmtDeleted"][0])/map2StandardizeMetricsCommit["stmtDeleted"][1],
+                            (float(commits[i]["churn"])-map2StandardizeMetricsCommit["churn"][0])/map2StandardizeMetricsCommit["churn"][1],
+                            (float(commits[i]["decl"])-map2StandardizeMetricsCommit["decl"][0])/map2StandardizeMetricsCommit["decl"][1],
+                            (float(commits[i]["cond"])-map2StandardizeMetricsCommit["cond"][0])/map2StandardizeMetricsCommit["cond"][1],
+                            (float(commits[i]["elseAdded"])-map2StandardizeMetricsCommit["elseAdded"][0])/map2StandardizeMetricsCommit["elseAdded"][1],
+                            (float(commits[i]["elseDeleted"])-map2StandardizeMetricsCommit["elseDeleted"][0])/map2StandardizeMetricsCommit["elseDeleted"][1]
                         ]
-                        vector[0] = node["semantics"]
-                        if(node["author"] in committer2Num):
-                            vector[1][committer2Num[node["author"]]] = 1
-                        else:
-                            vector[1][0] = 1
-                        if(node["isMerge"]==True):
-                            vector[2][0] = 1
-                        else:
-                            vector[2][0] = 0
-                        if(node["isFixingBug"]==True):
-                            vector[2][1] = 1
-                        else:
-                            vector[2][1] = 0
-                        for i in range (50):
-                            if(node["interval"] <= tableInterval[i]):
-                                vector[3][i]=1
-                                break
-                        for type in range(3): #add, delete, churn
-                            for i in range(50):
-                                if( node["churn"][type] <= tableChurn[type][i] ):
-                                    vector[4][type][i] = 1
-                                    break
-                        for pathModule in node["coupling"]:
-                            if(pathModule in module2Num):
-                                vector[5][module2Num[pathModule]] = 1
-                            else:
-                                vector[5][0] = 1
-                        sample["x"]["commitseq"][node["num"]] = vector[0]+vector[1]+vector[2]+vector[3]+vector[4][0]+vector[4][1]+vector[4][2]+vector[5]
                 if(cfg.checkProcessMetricsExists()):
                     sample["x"]["processmetrics"].extend(
                         [
-                            (float(sampleJson["moduleHistories"])-map2StandardizeMetricsProcess["moduleHistories"][0]) / map2StandardizeMetricsProcess["moduleHistories"][1],
-                            (float(sampleJson["authors"])-map2StandardizeMetricsProcess["authors"][0]) / map2StandardizeMetricsProcess["authors"][1],
-                            (float(sampleJson["stmtAdded"])-map2StandardizeMetricsProcess["stmtAdded"][0]) / map2StandardizeMetricsProcess["stmtAdded"][1],
-                            (float(sampleJson["maxStmtAdded"])-map2StandardizeMetricsProcess["maxStmtAdded"][0]) / map2StandardizeMetricsProcess["maxStmtAdded"][1],
-                            (float(sampleJson["avgStmtAdded"])-map2StandardizeMetricsProcess["avgStmtAdded"][0]) / map2StandardizeMetricsProcess["avgStmtAdded"][1],
-                            (float(sampleJson["stmtDeleted"])-map2StandardizeMetricsProcess["stmtDeleted"][0]) / map2StandardizeMetricsProcess["stmtDeleted"][1],
-                            (float(sampleJson["maxStmtDeleted"])-map2StandardizeMetricsProcess["maxStmtDeleted"][0]) / map2StandardizeMetricsProcess["maxStmtDeleted"][1],
-                            (float(sampleJson["avgStmtDeleted"])-map2StandardizeMetricsProcess["avgStmtDeleted"][0]) / map2StandardizeMetricsProcess["avgStmtDeleted"][1],
-                            (float(sampleJson["churn"])-map2StandardizeMetricsProcess["churn"][0]) / map2StandardizeMetricsProcess["churn"][1],
-                            (float(sampleJson["maxChurn"])-map2StandardizeMetricsProcess["maxChurn"][0]) / map2StandardizeMetricsProcess["maxChurn"][1],
-                            (float(sampleJson["avgChurn"])-map2StandardizeMetricsProcess["avgChurn"][0]) / map2StandardizeMetricsProcess["avgChurn"][1],
-                            (float(sampleJson["decl"])-map2StandardizeMetricsProcess["decl"][0]) / map2StandardizeMetricsProcess["decl"][1],
-                            (float(sampleJson["cond"])-map2StandardizeMetricsProcess["cond"][0]) / map2StandardizeMetricsProcess["cond"][1],
-                            (float(sampleJson["elseAdded"])-map2StandardizeMetricsProcess["elseAdded"][0]) / map2StandardizeMetricsProcess["elseAdded"][1],
-                            (float(sampleJson["elseDeleted"])-map2StandardizeMetricsProcess["elseDeleted"][0]) / map2StandardizeMetricsProcess["elseDeleted"][1],
-#                            (float(sampleJson["addLOC"])-map2StandardizeMetricsProcess["addLOC"][0]) / map2StandardizeMetricsProcess["addLOC"][1],
-#                            (float(sampleJson["delLOC"])-map2StandardizeMetricsProcess["delLOC"][0]) / map2StandardizeMetricsProcess["delLOC"][1],
-#                            (float(sampleJson["devMinor"])-map2StandardizeMetricsProcess["devMinor"][0]) / map2StandardizeMetricsProcess["devMinor"][1],
-#                            (float(sampleJson["devMajor"])-map2StandardizeMetricsProcess["devMajor"][0]) / map2StandardizeMetricsProcess["devMajor"][1],
-#                            (float(sampleJson["ownership"])-map2StandardizeMetricsProcess["ownership"][0]) / map2StandardizeMetricsProcess["ownership"][1],
-#                            (float(sampleJson["fixChgNum"])-map2StandardizeMetricsProcess["fixChgNum"][0]) / map2StandardizeMetricsProcess["fixChgNum"][1],
-#                            (float(sampleJson["pastBugNum"])-map2StandardizeMetricsProcess["pastBugNum"][0]) / map2StandardizeMetricsProcess["pastBugNum"][1],
-#                            (float(sampleJson["bugIntroNum"])-map2StandardizeMetricsProcess["bugIntroNum"][0]) / map2StandardizeMetricsProcess["bugIntroNum"][1],
-#                            (float(sampleJson["logCoupNum"])-map2StandardizeMetricsProcess["logCoupNum"][0]) / map2StandardizeMetricsProcess["logCoupNum"][1],
-#                            (float(sampleJson["period"])-map2StandardizeMetricsProcess["period"][0]) / map2StandardizeMetricsProcess["period"][1],
-#                            (float(sampleJson["avgInterval"])-map2StandardizeMetricsProcess["avgInterval"][0]) / map2StandardizeMetricsProcess["avgInterval"][1],
-#                            (float(sampleJson["maxInterval"])-map2StandardizeMetricsProcess["maxInterval"][0]) / map2StandardizeMetricsProcess["maxInterval"][1],
-#                            (float(sampleJson["minInterval"])-map2StandardizeMetricsProcess["minInterval"][0]) / map2StandardizeMetricsProcess["minInterval"][1],
+                            (float(sampleJson["commitGraph"]["moduleHistories"])-map2StandardizeMetricsProcess["moduleHistories"][0]) / map2StandardizeMetricsProcess["moduleHistories"][1],
+                            (float(sampleJson["commitGraph"]["authors"])-map2StandardizeMetricsProcess["authors"][0]) / map2StandardizeMetricsProcess["authors"][1],
+                            (float(sampleJson["commitGraph"]["stmtAdded"])-map2StandardizeMetricsProcess["stmtAdded"][0]) / map2StandardizeMetricsProcess["stmtAdded"][1],
+                            (float(sampleJson["commitGraph"]["maxStmtAdded"])-map2StandardizeMetricsProcess["maxStmtAdded"][0]) / map2StandardizeMetricsProcess["maxStmtAdded"][1],
+                            (float(sampleJson["commitGraph"]["avgStmtAdded"])-map2StandardizeMetricsProcess["avgStmtAdded"][0]) / map2StandardizeMetricsProcess["avgStmtAdded"][1],
+                            (float(sampleJson["commitGraph"]["stmtDeleted"])-map2StandardizeMetricsProcess["stmtDeleted"][0]) / map2StandardizeMetricsProcess["stmtDeleted"][1],
+                            (float(sampleJson["commitGraph"]["maxStmtDeleted"])-map2StandardizeMetricsProcess["maxStmtDeleted"][0]) / map2StandardizeMetricsProcess["maxStmtDeleted"][1],
+                            (float(sampleJson["commitGraph"]["avgStmtDeleted"])-map2StandardizeMetricsProcess["avgStmtDeleted"][0]) / map2StandardizeMetricsProcess["avgStmtDeleted"][1],
+                            (float(sampleJson["commitGraph"]["churn"])-map2StandardizeMetricsProcess["churn"][0]) / map2StandardizeMetricsProcess["churn"][1],
+                            (float(sampleJson["commitGraph"]["maxChurn"])-map2StandardizeMetricsProcess["maxChurn"][0]) / map2StandardizeMetricsProcess["maxChurn"][1],
+                            (float(sampleJson["commitGraph"]["avgChurn"])-map2StandardizeMetricsProcess["avgChurn"][0]) / map2StandardizeMetricsProcess["avgChurn"][1],
+                            (float(sampleJson["commitGraph"]["decl"])-map2StandardizeMetricsProcess["decl"][0]) / map2StandardizeMetricsProcess["decl"][1],
+                            (float(sampleJson["commitGraph"]["cond"])-map2StandardizeMetricsProcess["cond"][0]) / map2StandardizeMetricsProcess["cond"][1],
+                            (float(sampleJson["commitGraph"]["elseAdded"])-map2StandardizeMetricsProcess["elseAdded"][0]) / map2StandardizeMetricsProcess["elseAdded"][1],
+                            (float(sampleJson["commitGraph"]["elseDeleted"])-map2StandardizeMetricsProcess["elseDeleted"][0]) / map2StandardizeMetricsProcess["elseDeleted"][1]
                         ]
                     )
             listSamples.append(sample)
-            #name, ext = os.path.splitext(pathSample)
-            #pathVector = name+"_vector"
-            #with open(pathVector, "w") as f:
-            #    json.dump(sample, f)
-        # 学習時のモジュールIDと総数、コミッターIDと総数、intervalの離散化範囲、churnの離散化範囲、各種メトリクスの標準化のための値の算出
-        module2Num = {"other": 0}#id==0: その他
-        committer2Num = {"other": 0}#id==0: その他
-        tableInterval = [1000000]*50
-        tableChurn = [[1000000]*50, [1000000]*50, [1000000]*50]
+        metricsCommit = {
+            "stmtAdded": [],
+            "stmtDeleted": [],
+            "churn": [],
+            "decl": [],
+            "cond": [],
+            "elseAdded": [],
+            "elseDeleted": []
+        }
         metricsCode = {
             "fanIn" : [],
             "fanOut" : [],
@@ -242,7 +205,6 @@ class DataManeger(torch.utils.data.Dataset):
             "complexity" : [],
             "execStmt" : [],
             "maxNesting" : [],
-            "loc":[]
         }
         metricsProcess = {
             "moduleHistories" : [],
@@ -260,19 +222,15 @@ class DataManeger(torch.utils.data.Dataset):
             "cond" : [],
             "elseAdded" : [],
             "elseDeleted" : [],
-            "addLOC" : [],
-            "delLOC" : [],
-            "devMinor" : [],
-            "devMajor" : [],
-            "ownership" : [],
-            "fixChgNum" : [],
-            "pastBugNum" : [],
-            "bugIntroNum" : [],
-            "logCoupNum" : [],
-            "period" : [],
-            "avgInterval" : [],
-            "maxInterval" : [],
-            "minInterval" : []
+        }
+        map2StandardizeMetricsCommit = {
+            "stmtAdded": [],
+            "stmtDeleted": [],
+            "churn": [],
+            "decl": [],
+            "cond": [],
+            "elseAdded": [],
+            "elseDeleted": []
         }
         map2StandardizeMetricsCode = {
             "fanIn" : [],
@@ -284,7 +242,6 @@ class DataManeger(torch.utils.data.Dataset):
             "complexity" : [],
             "execStmt" : [],
             "maxNesting" : [],
-            "loc":[]
         }
         map2StandardizeMetricsProcess = {
             "moduleHistories" : [],
@@ -302,20 +259,16 @@ class DataManeger(torch.utils.data.Dataset):
             "cond" : [],
             "elseAdded" : [],
             "elseDeleted" : [],
-            "addLOC" : [],
-            "delLOC" : [],
-            "devMinor" : [],
-            "devMajor" : [],
-            "ownership" : [],
-            "fixChgNum" : [],
-            "pastBugNum" : [],
-            "bugIntroNum" : [],
-            "logCoupNum" : [],
-            "period" : [],
-            "avgInterval" : [],
-            "maxInterval" : [],
-            "minInterval" : [],
         }
+        if(cfg.checkCommitSeqExists()):
+            for pathSample4Train in self.pathsSample4Train:
+                with open(pathSample4Train, encoding="utf-8") as fSample4Train:
+                    sampleJson = json.load(fSample4Train)
+                    for commit in sampleJson["commitGraph"]["modifications"].values():
+                        for item in metricsCommit:
+                            metricsCommit[item].append(commit[item])
+            for item in map2StandardizeMetricsCommit:
+                map2StandardizeMetricsCommit[item] = [np.array(metricsCommit[item]).mean(), np.std(metricsCommit[item])]
         if(cfg.checkCodeMetricsExists()):
             for pathSample4Train in self.pathsSample4Train:
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
@@ -332,82 +285,10 @@ class DataManeger(torch.utils.data.Dataset):
                         metricsProcess[item].append(sampleJson[item])
             for item in map2StandardizeMetricsProcess:
                 map2StandardizeMetricsProcess[item] = [np.array(metricsProcess[item]).mean(), np.std(metricsProcess[item])]
-        if(cfg.checkCommitGraphExists() or cfg.checkCommitSeqExists()):
-            numOfAllNodes = 0
-            intervals = [0]*1000
-            churns = [[0]*1000, [0]*1000, [0]*1000]
-            for pathSample4Train in self.pathsSample4Train:
-                with open(pathSample4Train, encoding="utf-8") as fSample4Train:
-                    sampleJson = json.load(fSample4Train)
-                    numOfNodes = len(sampleJson["commitGraph"])
-                    # 学習時のモジュールIDについて
-                    if(not sampleJson["path"] in module2Num):
-                        module2Num[sampleJson["path"]] = len(module2Num)
-                    for i in range(numOfNodes):
-                        node = sampleJson["commitGraph"][i]
-                        # 学習時のコミッターIDについて
-                        if(not node["author"] in committer2Num):
-                            committer2Num[node["author"]] = len(committer2Num)
-                        if(node["num"]==0):
-                            continue
-                        else:
-                            numOfAllNodes += 1
-                            if(1000<=node["interval"]):
-                                intervals[999] += 1
-                            else:
-                                intervals[node["interval"]] += 1
-                            if(1000<=node["churn"][0]):
-                                churns[0][999] += 1
-                            else:
-                                churns[0][node["churn"][0]] += 1
-                            if(1000<=node["churn"][1]):
-                                churns[1][999] += 1
-                            else:
-                                churns[1][node["churn"][1]] += 1
-                            if(1000<=node["churn"][2]):
-                                churns[2][999] += 1
-                            else:
-                                churns[2][node["churn"][2]] += 1
-            numOfNodesPre = 0
-            numOfNodesNow = 0
-            index = 0
-            for i in range(len(intervals)):
-                numOfNodesNow += intervals[i]
-                if( (numOfAllNodes/50)*index < numOfNodesNow-numOfNodesPre):
-                    tableInterval[index] = i
-                    numOfNodesPre = numOfNodesNow
-                    index+=1
-            numOfNodesPre = 0
-            numOfNodesNow = 0
-            index = 0
-            for i in range(len(churns[0])):
-                numOfNodesNow += churns[0][i]
-                if( (numOfAllNodes/50)*index < numOfNodesNow-numOfNodesPre):
-                    tableChurn[0][index] = i
-                    numOfNodesPre = numOfNodesNow
-                    index+=1
-            numOfNodesPre = 0
-            numOfNodesNow = 0
-            index = 0
-            for i in range(len(churns[1])):
-                numOfNodesNow += churns[1][i]
-                if( (numOfAllNodes/50)*index < numOfNodesNow-numOfNodesPre):
-                    tableChurn[1][index] = i
-                    numOfNodesPre = numOfNodesNow
-                    index+=1
-            numOfNodesPre = 0
-            numOfNodesNow = 0
-            index = 0
-            for i in range(len(churns[2])):
-                numOfNodesNow += churns[2][i]
-                if( (numOfAllNodes/50)*index < numOfNodesNow-numOfNodesPre):
-                    tableChurn[2][index] = i
-                    numOfNodesPre = numOfNodesNow
-                    index+=1
         for pathSample4Train in self.pathsSample4Train:
-            loadSample(pathSample4Train, self.samples4Train, module2Num, committer2Num, tableInterval, tableChurn, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
+            loadSample(pathSample4Train, self.samples4Train, map2StandardizeMetricsCommit, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
         for pathSample4Test in self.pathsSample4Test:
-            loadSample(pathSample4Test, self.samples4Test, module2Num, committer2Num, tableInterval, tableChurn, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
+            loadSample(pathSample4Test, self.samples4Test, map2StandardizeMetricsCommit, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
 
     def generateDatasetsTrainValid(self, isCrossValidation = False, numOfSplit = 5):
         samplesBuggy    = []

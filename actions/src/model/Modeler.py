@@ -431,6 +431,18 @@ class Modeler(nn.Module):
                     "beta2Adam": 0.999,
                     "epsilonAdam": 1e-08
                 }
+            elif(cfg.checkCommitSeqExists()):
+                hp_default = {
+                    "commitseq_numOfLayers": 2,
+                    "commitseq_hiddenSize": 128,
+                    "commitseq_rateDropout": 0.0,
+                    "sizeBatch": 128,
+                    "optimizer": "adam",
+                    "lrAdam": 1e-05,
+                    "beta1Adam": 0.9,
+                    "beta2Adam": 0.999,
+                    "epsilonAdam": 1e-08
+                }
             study.enqueue_trial(hp_default)
         study.optimize(objectiveFunction, timeout=cfg.period4HyperParameterSearch)
         #save the hyperparameter that seems to be the best.
