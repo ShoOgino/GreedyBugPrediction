@@ -155,16 +155,19 @@ class DataManeger(torch.utils.data.Dataset):
                     commits = sorted(commits, key=lambda x: x['date'])
                     numOfCommits = len(commits)
                     sample["x"]["commitseq"] = [None] * numOfCommits
-                    for i in range(numOfCommits):
-                        sample["x"]["commitseq"][i] = [
-                            (float(commits[i]["stmtAdded"])-map2StandardizeMetricsCommit["stmtAdded"][0])/map2StandardizeMetricsCommit["stmtAdded"][1],
-                            (float(commits[i]["stmtDeleted"])-map2StandardizeMetricsCommit["stmtDeleted"][0])/map2StandardizeMetricsCommit["stmtDeleted"][1],
-                            (float(commits[i]["churn"])-map2StandardizeMetricsCommit["churn"][0])/map2StandardizeMetricsCommit["churn"][1],
-                            (float(commits[i]["decl"])-map2StandardizeMetricsCommit["decl"][0])/map2StandardizeMetricsCommit["decl"][1],
-                            (float(commits[i]["cond"])-map2StandardizeMetricsCommit["cond"][0])/map2StandardizeMetricsCommit["cond"][1],
-                            (float(commits[i]["elseAdded"])-map2StandardizeMetricsCommit["elseAdded"][0])/map2StandardizeMetricsCommit["elseAdded"][1],
-                            (float(commits[i]["elseDeleted"])-map2StandardizeMetricsCommit["elseDeleted"][0])/map2StandardizeMetricsCommit["elseDeleted"][1]
-                        ]
+                    if(0<numOfCommits):
+                        for i in range(numOfCommits):
+                            sample["x"]["commitseq"][i] = [
+                                (float(commits[i]["stmtAdded"])-map2StandardizeMetricsCommit["stmtAdded"][0])/map2StandardizeMetricsCommit["stmtAdded"][1],
+                                (float(commits[i]["stmtDeleted"])-map2StandardizeMetricsCommit["stmtDeleted"][0])/map2StandardizeMetricsCommit["stmtDeleted"][1],
+                                (float(commits[i]["churn"])-map2StandardizeMetricsCommit["churn"][0])/map2StandardizeMetricsCommit["churn"][1],
+                                (float(commits[i]["decl"])-map2StandardizeMetricsCommit["decl"][0])/map2StandardizeMetricsCommit["decl"][1],
+                                (float(commits[i]["cond"])-map2StandardizeMetricsCommit["cond"][0])/map2StandardizeMetricsCommit["cond"][1],
+                                (float(commits[i]["elseAdded"])-map2StandardizeMetricsCommit["elseAdded"][0])/map2StandardizeMetricsCommit["elseAdded"][1],
+                                (float(commits[i]["elseDeleted"])-map2StandardizeMetricsCommit["elseDeleted"][0])/map2StandardizeMetricsCommit["elseDeleted"][1]
+                            ]
+                    else:
+                        sample["x"]["commitseq"] = [[0, 0, 0, 0, 0, 0, 0]]
                 if(cfg.checkProcessMetricsExists()):
                     sample["x"]["processmetrics"].extend(
                         [
