@@ -18,24 +18,40 @@ class DataManeger(torch.utils.data.Dataset):
         self.datasets_Train_Valid = []
         self.datasets_Train_Test = {}
         self.selectedInputData = cfg.typesInput
-
-    def setPathsSample(self, pathsSample, isForTest=False):
+    def setPathsSample(self, pathDir, isForTest=False):
         if(isForTest):
-            for path in pathsSample:
+            for path in pathDir:
                 if(os.path.isdir(path)):
                     pathsSearched = glob.glob(path+"/**/*.json", recursive=True)
                     self.pathsSample4Test.extend(pathsSearched)
-                else:
-                    self.pathsSample4Test.append(path)
         else:
-            for path in pathsSample:
+            for path in pathDir:
                 if(os.path.isdir(path)):
                     pathsSearched = glob.glob(path+"/**/*.json", recursive=True)
                     self.pathsSample4Train.extend(pathsSearched)
-                else:
-                    self.pathsSample4Train.append(path)
-
     def loadSamples(self):
+        listSamples = []
+        if(cfg.checkMnist4TestExists()):
+            sample = {}
+            sample["id"] = ""
+            sample["y"] = ""
+            sample["x"] = {
+                "ast": {
+                    "nodes": [],
+                    "edges": []
+                },
+                "astseq": [],
+                "codemetrics": [],
+                "commitgraph": {
+                    "nodes": [],
+                    "edges": []
+                },
+                "commitseq": [],
+                "processmetrics": []
+            }
+            listSamples.append(sample)
+            random.shuffle(listSamples)
+            self.samples4Train = listSamples
         def flattenTree(node):
             seqNode = []
             seqNode.append(node)
@@ -172,7 +188,6 @@ class DataManeger(torch.utils.data.Dataset):
                     sample["x"]["processmetrics"].extend(
                         [
                             (float(sampleJson["commitGraph"]["moduleHistories"])-map2StandardizeMetricsProcess["moduleHistories"][0]) / map2StandardizeMetricsProcess["moduleHistories"][1],
-                            (float(sampleJson["commitGraph"]["authors"])-map2StandardizeMetricsProcess["authors"][0]) / map2StandardizeMetricsProcess["authors"][1],
                             (float(sampleJson["commitGraph"]["sumStmtAdded"])-map2StandardizeMetricsProcess["sumStmtAdded"][0]) / map2StandardizeMetricsProcess["sumStmtAdded"][1],
                             (float(sampleJson["commitGraph"]["maxStmtAdded"])-map2StandardizeMetricsProcess["maxStmtAdded"][0]) / map2StandardizeMetricsProcess["maxStmtAdded"][1],
                             (float(sampleJson["commitGraph"]["avgStmtAdded"])-map2StandardizeMetricsProcess["avgStmtAdded"][0]) / map2StandardizeMetricsProcess["avgStmtAdded"][1],
@@ -211,7 +226,6 @@ class DataManeger(torch.utils.data.Dataset):
         }
         metricsProcess = {
             "moduleHistories" : [],
-            "authors" : [],
             "sumStmtAdded" : [],
             "maxStmtAdded" : [],
             "avgStmtAdded" : [],
@@ -248,7 +262,6 @@ class DataManeger(torch.utils.data.Dataset):
         }
         map2StandardizeMetricsProcess = {
             "moduleHistories" : [],
-            "authors" : [],
             "sumStmtAdded" : [],
             "maxStmtAdded" : [],
             "avgStmtAdded" : [],
@@ -292,7 +305,6 @@ class DataManeger(torch.utils.data.Dataset):
             loadSample(pathSample4Train, self.samples4Train, map2StandardizeMetricsCommit, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
         for pathSample4Test in self.pathsSample4Test:
             loadSample(pathSample4Test, self.samples4Test, map2StandardizeMetricsCommit, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
-
     def generateDatasetsTrainValid(self, isCrossValidation = False, numOfSplit = 5):
         samplesBuggy    = []
         samplesNotBuggy = []
@@ -325,7 +337,6 @@ class DataManeger(torch.utils.data.Dataset):
             self.datasets_Train_Valid.append(dataset_train_valid)
             if(not isCrossValidation):
                 break
-
     def generateDatasetsTrainTest(self):
         dataset_Train_Test={}
         dataset4Train=[]
@@ -345,7 +356,6 @@ class DataManeger(torch.utils.data.Dataset):
         dataset_Train_Test["train"] = Dataset(dataset4Train)
         dataset_Train_Test["test"] = Dataset(dataset4Test)
         self.datasets_Train_Test = dataset_Train_Test
-
     def showSummary(self):
         print(" len(samples4Train): " + str(len(self.samples4Train)))
         print(" len(samples4Test): " + str(len(self.samples4Test)))

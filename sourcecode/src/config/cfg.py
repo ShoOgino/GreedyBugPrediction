@@ -9,6 +9,7 @@ class cfg:
         searchParameter = 2
         test = 3
     class TypeInput(Enum):
+        mnist4test = 0
         ast = 1
         astseq = 2
         codemetrics = 3
@@ -24,7 +25,7 @@ class cfg:
         cfg.pathsSampleTrain = None # list
         cfg.pathsSampleTest = None # list
         cfg.isCrossValidation = False
-        cfg.splitSize4Validation = 5
+        cfg.splitSize4CrossValidation = 5
         cfg.epochsEarlyStopping = 10
         cfg.trials4HyperParameterSearch = None
         cfg.period4HyperParameterSearch = None
@@ -41,6 +42,8 @@ class cfg:
     def checkPurposeContainsTest():
         return cfg.Purpose.test in cfg.purpose
 
+    def checkMnist4TestExists():
+        return cfg.TypeInput.mnist4test in cfg.typesInput
     def checkASTExists():
         return cfg.TypeInput.ast in cfg.typesInput
     def checkASTSeqExists():

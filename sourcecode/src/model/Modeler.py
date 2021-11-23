@@ -35,7 +35,8 @@ class Modeler(nn.Module):
         self.epochsEarlyStopping = cfg.epochsEarlyStopping
         self.device = cfg.device
         torch.backends.cudnn.enabled = True
-
+        # function
+        self.forward = None
     def defineNetwork(self, hp, dataset):
         print(hp)
         numOfFeatures = 0
@@ -96,30 +97,22 @@ class Modeler(nn.Module):
                     out_features = hp["metrics_numOfOutput"]
                 )
             numOfFeatures += hp["metrics_numOfOutput"]
-        else:
-            if(cfg.checkCodeMetricsExists()):
-                pass
-            if(cfg.checkProcessMetricsExists()):
-                pass
         self.componentsNetwork["features"] = nn.Linear(numOfFeatures, 1)
-        self.componentsNetwork["activation"] = nn.Sigmoid()
         def forward(ast, astseq, codemetrics, commitgraph, commitseq, processmetrics):
             features = []
             if(cfg.checkASTExists()):
                 pass
             if(cfg.checkASTSeqExists()):
-                _, (parametersHiddenBiLSTM, _) = self.componentsNetwork["astseq"]["LSTM"](astseq)
-                parametersHiddenBiLSTM = torch.cat(torch.split(parametersHiddenBiLSTM[(hp["astseq_numOfLayers"]-1)*2:], 1), dim=2)
-                #featuresFromASTSeq = self.componentsNetwork["astseq"]["linear"](parametersHiddenBiLSTM)
-                featuresFromASTSeq = parametersHiddenBiLSTM.squeeze()
+                _, (parametersBiLSTM, _) = self.componentsNetwork["astseq"]["LSTM"](astseq)
+                parametersBiLSTM = torch.cat(torch.split(parametersBiLSTM[(hp["astseq_numOfLayers"]-1)*2:], 1), dim=2)
+                featuresFromASTSeq = parametersBiLSTM.squeeze()
                 features.append(featuresFromASTSeq)
             if(cfg.checkCommitGraphExists()):
                 pass
             if(cfg.checkCommitSeqExists()):
-                _, (parametersHiddenBiLSTM, _) = self.componentsNetwork["commitseq"]["LSTM"](commitseq)
-                parametersHiddenBiLSTM = torch.cat(torch.split(parametersHiddenBiLSTM[(hp["commitseq_numOfLayers"]-1)*2:], 1), dim=2)
-                #featuresFromASTSeq = self.componentsNetwork["astseq"]["linear"](parametersHiddenBiLSTM)
-                featuresFromCommitSeq = parametersHiddenBiLSTM.squeeze()
+                _, (parametersBiLSTM, __) = self.componentsNetwork["commitseq"]["LSTM"](commitseq)
+                parametersBiLSTM = torch.cat(torch.split(parametersBiLSTM[(hp["commitseq_numOfLayers"]-1)*2:], 1), dim=2)
+                featuresFromCommitSeq = parametersBiLSTM.squeeze()
                 features.append(featuresFromCommitSeq)
             if(cfg.checkCodeMetricsExists() and cfg.checkProcessMetricsExists()):
                 featuresFromMetrics = torch.cat([codemetrics, processmetrics], dim=1)
@@ -133,13 +126,11 @@ class Modeler(nn.Module):
                 features.append(featuresFromMetrics)
             features = torch.cat(features, dim = 1)
             y = self.componentsNetwork["features"](features)
-            #y = self.componentsNetwork["activation"](y)
             return y
         self.forward = forward
         model = self.to(self.device)
         summary(model)
         return model
-
     def getOptimizer(self, hp, model):
         nameOptimizer = hp["optimizer"]
         if nameOptimizer == 'adam':
@@ -149,7 +140,6 @@ class Modeler(nn.Module):
             epsilonAdam = hp["epsilonAdam"]
             optimizer = torch.optim.Adam(model.parameters(), lr=lrAdam, betas=(beta_1Adam,beta_2Adam), eps=epsilonAdam)
         return optimizer
-
     def train_(self, dataLoader, model, lossFunction, optimizer, numEpochs, isEarlyStopping):
         lossesTrain = []
         lossesValid = []
@@ -216,7 +206,6 @@ class Modeler(nn.Module):
             if(isEarlyStopping and self.epochsEarlyStopping<epoch-epochBestValid):
                 break
         return epochBestValid, lossesTrain, lossesValid, accsTrain, accsValid
-
     def test(self, datasets_Train_Test):
         with open(cfg.pathHyperParameters, mode='r') as file:
             hp = json.load(file)
@@ -280,8 +269,7 @@ class Modeler(nn.Module):
         cm = confusion_matrix(yTest, yPredicted)
         sns.heatmap(cm, annot=True, cmap='Blues')
         plt.savefig(cfg.pathDirOutput+"/ConfusionMatrix.png")
-
-    def plotGraphTraining(self, lossesTrain, lossesValid, accTrain, accValid, numberTrial):
+    def plotGraphTraining(self, lossesTrain, lossesValid, accTrain, accValid, title):
         epochs = range(len(lossesTrain))
 
         fig = plt.figure()
@@ -290,14 +278,13 @@ class Modeler(nn.Module):
         plt.plot(epochs, accTrain, linestyle="-", color='r', label = 'accTrain')
         plt.plot(epochs, lossesValid, linestyle=":", color='b' , label= 'lossVal')
         plt.plot(epochs, accValid, linestyle=":", color='r' , label= 'accVal')
-        plt.title(str(numberTrial))
+        plt.title(title)
         plt.legend()
 
-        pathGraph = os.path.join(cfg.pathDirOutput, str(numberTrial) + '.png')
+        pathGraph = os.path.join(cfg.pathDirOutput, title + '.png')
         fig.savefig(pathGraph)
         plt.clf()
         plt.close()
-
     def plotGraphHyperParameterSearch(self, trials):
         numOfTrials = range(len(trials))
 
@@ -311,11 +298,10 @@ class Modeler(nn.Module):
         fig.savefig(pathGraph)
         plt.clf()
         plt.close()
-
     def searchHyperParameter(self, datasets_Train_Valid):
         def objectiveFunction(trial):
             numEpochs = 10000
-            scoreAverage=0
+            lossesCrossValidation=0
             for index4CrossValidation in range(len(datasets_Train_Valid)):
                 # prepare dataset
                 dataset4Train = datasets_Train_Valid[index4CrossValidation]["train"]
@@ -373,7 +359,7 @@ class Modeler(nn.Module):
 
                 # train!
                 epochBestValid, lossesTrain, lossesValid, accsTrain, accsValid = self.train_(dataloader, model, lossFunction, optimizer, numEpochs, isEarlyStopping=True)
-                self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, trial.number)
+                self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, "graphTrainToValid_" + str(trial.number) + "_" + str(index4CrossValidation))
                 trial.set_user_attr("numEpochs", epochBestValid+1)
 
                 # 1エポックだけ偶然高い精度が出たような場合を弾くために、前後のepochで平均を取る。
@@ -381,16 +367,16 @@ class Modeler(nn.Module):
                 indexValMin = lossesValid.index(lossValMin)
                 indexLast = len(lossesValid)-1
                 index4Forward = indexValMin+4 if indexValMin+4 < indexLast else indexLast
-                score=0
+                loss=0
                 for i in range(5):
-                    score += lossesValid[index4Forward-i]
-                score = score / 5
-                scoreAverage += score
-            scoreAverage = scoreAverage / len(datasets_Train_Valid)
+                    loss += lossesValid[index4Forward-i]
+                loss = loss / 5
+                lossesCrossValidation += loss
+            value2BeOptimized = lossesCrossValidation / len(datasets_Train_Valid)
             #全体のログをloggerで出力
             #with open(os.path.join(cfg.pathDirOutput, "logSearchHyperParameter.txt"), mode='a') as f:
             #    f.write(str(score)+","+str(trial.datetime_start)+","+str(dict(trial.params, **trial.user_attrs))+'\n')
-            return scoreAverage
+            return value2BeOptimized
         study = optuna.create_study(study_name="optuna", storage='sqlite:///'+cfg.pathDirOutput + "/optuna.db", load_if_exists=True)
         if(len(study.get_trials())==0):
             if(cfg.checkCommitSeqExists() & cfg.checkASTSeqExists() & cfg.checkCodeMetricsExists() & cfg.checkProcessMetricsExists()):
@@ -462,11 +448,10 @@ class Modeler(nn.Module):
             study.enqueue_trial(hp_default)
         study.optimize(objectiveFunction, timeout=cfg.period4HyperParameterSearch)
         #save the hyperparameter that seems to be the best.
-        #self.plotGraphHyperParameterSearch(study.get_trials())
+        self.plotGraphHyperParameterSearch(study.get_trials())
         cfg.pathHyperParameters = os.path.join(cfg.pathDirOutput, "hyperParameter.json")
         with open(cfg.pathHyperParameters, mode='w') as file:
             json.dump(dict(study.best_params.items()^study.best_trial.user_attrs.items()), file, indent=4)
-
     def searchParameter(self, datasets_Train_Test):
         with open(cfg.pathHyperParameters, mode='r') as file:
             hp = json.load(file)
@@ -500,7 +485,7 @@ class Modeler(nn.Module):
 
         # prepare model parameters
         _, lossesTrain, lossesValid, accsTrain, accsValid = self.train_(dataloader, model, lossFunction, optimizer, hp["numEpochs"], isEarlyStopping=False)
-        self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, 10000)
+        self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, "graphTrainToTest")
 
         cfg.pathParameters = os.path.join(cfg.pathDirOutput, "parameters")
         torch.save(model.state_dict(), cfg.pathParameters)
