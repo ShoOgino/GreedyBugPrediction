@@ -1,4 +1,4 @@
-from src.config.cfg import cfg
+from src.config.config import config
 from src.data.Dataset import Dataset
 
 import glob
@@ -17,7 +17,7 @@ class DataManeger(torch.utils.data.Dataset):
         self.samples4Test = []
         self.datasets_Train_Valid = []
         self.datasets_Train_Test = {}
-        self.selectedInputData = cfg.typesInput
+        self.selectedInputData = config.typesInput
     def setPathsSample(self, pathDir, isForTest=False):
         if(isForTest):
             for path in pathDir:
@@ -31,7 +31,7 @@ class DataManeger(torch.utils.data.Dataset):
                     self.pathsSample4Train.extend(pathsSearched)
     def loadSamples(self):
         listSamples = []
-        if(cfg.checkMnist4TestExists()):
+        if(config.checkMnist4TestExists()):
             sample = {}
             sample["id"] = ""
             sample["y"] = ""
@@ -50,6 +50,7 @@ class DataManeger(torch.utils.data.Dataset):
                 "processmetrics": []
             }
             listSamples.append(sample)
+            random.seed(0)
             random.shuffle(listSamples)
             self.samples4Train = listSamples
         def flattenTree(node):
@@ -82,7 +83,7 @@ class DataManeger(torch.utils.data.Dataset):
                     "commitseq": [],
                     "processmetrics": []
                 }
-                if(cfg.checkASTExists()):
+                if(config.checkASTExists()):
                     def findNodes(node):
                         nodes = flattenTree(node)
                         for index, node in enumerate(nodes):
@@ -97,7 +98,7 @@ class DataManeger(torch.utils.data.Dataset):
                         return edges
                     sample["x"]["ast"]["nodes"] = findNodes(sampleJson["ast"])
                     sample["x"]["ast"]["edges"] = findEdges(sampleJson["ast"])
-                if(cfg.checkASTSeqExists()):
+                if(config.checkASTSeqExists()):
                     def onehotnizeAST(ast):
                         astOnehotnized = []
                         for node in ast:
@@ -106,7 +107,7 @@ class DataManeger(torch.utils.data.Dataset):
                         return astOnehotnized
                     nodes = flattenTree(sampleJson["ast"])
                     sample["x"]["astseq"] = onehotnizeAST(nodes)
-                if(cfg.checkCodeMetricsExists()):
+                if(config.checkCodeMetricsExists()):
                     sample["x"]["codemetrics"].extend(
                         [
                             (float(sampleJson["sourcecode"]["fanIn"])-map2StandardizeMetricsCode["fanIn"][0]) / map2StandardizeMetricsCode["fanIn"][1],
@@ -120,7 +121,7 @@ class DataManeger(torch.utils.data.Dataset):
                             (float(sampleJson["sourcecode"]["maxNesting"])-map2StandardizeMetricsCode["maxNesting"][0]) / map2StandardizeMetricsCode["maxNesting"][1]
                         ]
                     )
-                if(cfg.checkCommitGraphExists()):
+                if(config.checkCommitGraphExists()):
                     numOfCommits = len(sampleJson["commitGraph"])
                     sample["x"]["commitgraph"]["nodes"] = [[None] for i in range(numOfCommits)]
                     for i in range(numOfCommits):
@@ -163,7 +164,7 @@ class DataManeger(torch.utils.data.Dataset):
                         sample["x"]["commitgraph"]["nodes"][node["num"]] = vector[0]+vector[1]+vector[2]+vector[3]+vector[4][0]+vector[4][1]+vector[4][2]+vector[5]
                         for numParent in node["parents"]:
                             sample["x"]["commitgraph"]["edges"].append([node["num"], numParent])
-                if(cfg.checkCommitSeqExists()):
+                if(config.checkCommitSeqExists()):
                     commits = []
                     for commit in sampleJson["commitGraph"]["modifications"].values():
                         if(not commit["isMerge"]):
@@ -184,7 +185,7 @@ class DataManeger(torch.utils.data.Dataset):
                             ]
                     else:
                         sample["x"]["commitseq"] = [[0, 0, 0, 0, 0, 0, 0]]
-                if(cfg.checkProcessMetricsExists()):
+                if(config.checkProcessMetricsExists()):
                     sample["x"]["processmetrics"].extend(
                         [
                             (float(sampleJson["commitGraph"]["moduleHistories"])-map2StandardizeMetricsProcess["moduleHistories"][0]) / map2StandardizeMetricsProcess["moduleHistories"][1],
@@ -276,7 +277,7 @@ class DataManeger(torch.utils.data.Dataset):
             "sumElseAdded" : [],
             "sumElseDeleted" : [],
         }
-        if(cfg.checkCommitSeqExists()):
+        if(config.checkCommitSeqExists()):
             for pathSample4Train in self.pathsSample4Train:
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
                     sampleJson = json.load(fSample4Train)
@@ -285,7 +286,7 @@ class DataManeger(torch.utils.data.Dataset):
                             metricsCommit[item].append(commit[item])
             for item in map2StandardizeMetricsCommit:
                 map2StandardizeMetricsCommit[item] = [np.array(metricsCommit[item]).mean(), np.std(metricsCommit[item])]
-        if(cfg.checkCodeMetricsExists()):
+        if(config.checkCodeMetricsExists()):
             for pathSample4Train in self.pathsSample4Train:
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
                     sampleJson = json.load(fSample4Train)
@@ -293,7 +294,7 @@ class DataManeger(torch.utils.data.Dataset):
                         metricsCode[item].append(sampleJson[item])
             for item in map2StandardizeMetricsCode:
                 map2StandardizeMetricsCode[item] = [np.array(metricsCode[item]).mean(), np.std(metricsCode[item])]
-        if(cfg.checkProcessMetricsExists()):
+        if(config.checkProcessMetricsExists()):
             for pathSample4Train in self.pathsSample4Train:
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
                     sampleJson = json.load(fSample4Train)
@@ -313,6 +314,7 @@ class DataManeger(torch.utils.data.Dataset):
                 samplesBuggy.append(data)
             elif(int(data["y"])==0):
                 samplesNotBuggy.append(data)
+        random.seed(0)
         random.shuffle(samplesBuggy)
         random.shuffle(samplesNotBuggy)
         for i in range(numOfSplit):
@@ -348,6 +350,7 @@ class DataManeger(torch.utils.data.Dataset):
                 samplesBuggy.append(data)
             elif(data['y']==0):
                 samplesNotBuggy.append(data)
+        random.seed(0)
         samplesBuggy = random.choices(samplesBuggy, k=len(samplesNotBuggy))
         dataset4Train.extend(samplesBuggy)
         dataset4Train.extend(samplesNotBuggy)

@@ -1,11 +1,5 @@
-from src.config.cfg import cfg
-from unicodedata import bidirectional
-from numpy.core.fromnumeric import size
-from numpy.distutils.lib2def import output_def
-from torch.nn.modules import dropout
-from torch.nn.modules.container import ModuleDict
-from torch.nn.modules.rnn import LSTM
-from torch.utils import data
+from src.config.config import config
+from src.data.Dataset import Dataset
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -16,26 +10,23 @@ import csv
 import matplotlib.pyplot as plt
 import seaborn as sns
 import json
-from sklearn.ensemble import RandomForestRegressor
+from torch.utils.data import DataLoader
+from torchinfo import summary
+from tqdm import tqdm
 from sklearn.metrics import mean_squared_error, classification_report
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score
-from collections import OrderedDict
-from torch.utils.data import DataLoader
-from torchinfo import summary
-from torchvision import transforms
-from tqdm import tqdm
-from src.data.Dataset import Dataset
+from src.log.wrapperLogger import wrapperLogger
+logger = wrapperLogger.setup_logger(__name__, config.pathLog)
 
 class Modeler(nn.Module):
     def __init__(self):
         super().__init__()
-        self.trials4HyperParameterSearch = cfg.trials4HyperParameterSearch
-        self.period4HyperParameterSearch = cfg.period4HyperParameterSearch
-        self.epochsEarlyStopping = cfg.epochsEarlyStopping
-        self.device = cfg.device
+        self.trials4HyperParameterSearch = config.trials4HyperParameterSearch
+        self.period4HyperParameterSearch = config.period4HyperParameterSearch
+        self.epochsEarlyStopping = config.epochs4EarlyStopping
+        self.device = config.device or "cuda:0"
         torch.backends.cudnn.enabled = True
-        # function
         self.forward = None
     def defineNetwork(self, hp, dataset):
         print(hp)
@@ -51,9 +42,9 @@ class Modeler(nn.Module):
                 "metrics": nn.ModuleDict()
             }
         )
-        if(cfg.checkASTExists()):
+        if(config.checkASTExists()):
             pass
-        if(cfg.checkASTSeqExists()):
+        if(config.checkASTSeqExists()):
             isBidirectional = True
             self.componentsNetwork["astseq"]["LSTM"] = nn.LSTM(
                     input_size = len(dataset.astseqs[0][0]),
@@ -68,9 +59,9 @@ class Modeler(nn.Module):
             else:
                 numOfFeatures_astseq = hp["astseq_hiddenSize"]
             numOfFeatures += numOfFeatures_astseq
-        if(cfg.checkCommitGraphExists()):
+        if(config.checkCommitGraphExists()):
             pass
-        if(cfg.checkCommitSeqExists()):
+        if(config.checkCommitSeqExists()):
             isBidirectional = True
             self.componentsNetwork["commitseq"]["LSTM"] = nn.LSTM(
                     input_size = len(dataset.commitseqs[0][0]),
@@ -85,7 +76,7 @@ class Modeler(nn.Module):
             else:
                 numOfFeatures_commitseq = hp["commitseq_hiddenSize"]
             numOfFeatures += numOfFeatures_commitseq
-        if(cfg.checkCodeMetricsExists() or cfg.checkProcessMetricsExists()):
+        if(config.checkCodeMetricsExists() or config.checkProcessMetricsExists()):
             numOfFeaturesMetrics = len(dataset.codemetricss[0])+len(dataset.processmetricss[0])
             for i in range(hp["metrics_numOfLayers"]):
                 if( i == 0 ):
@@ -100,26 +91,26 @@ class Modeler(nn.Module):
         self.componentsNetwork["features"] = nn.Linear(numOfFeatures, 1)
         def forward(ast, astseq, codemetrics, commitgraph, commitseq, processmetrics):
             features = []
-            if(cfg.checkASTExists()):
+            if(config.checkASTExists()):
                 pass
-            if(cfg.checkASTSeqExists()):
+            if(config.checkASTSeqExists()):
                 _, (parametersBiLSTM, _) = self.componentsNetwork["astseq"]["LSTM"](astseq)
                 parametersBiLSTM = torch.cat(torch.split(parametersBiLSTM[(hp["astseq_numOfLayers"]-1)*2:], 1), dim=2)
                 featuresFromASTSeq = parametersBiLSTM.squeeze()
                 features.append(featuresFromASTSeq)
-            if(cfg.checkCommitGraphExists()):
+            if(config.checkCommitGraphExists()):
                 pass
-            if(cfg.checkCommitSeqExists()):
+            if(config.checkCommitSeqExists()):
                 _, (parametersBiLSTM, __) = self.componentsNetwork["commitseq"]["LSTM"](commitseq)
                 parametersBiLSTM = torch.cat(torch.split(parametersBiLSTM[(hp["commitseq_numOfLayers"]-1)*2:], 1), dim=2)
                 featuresFromCommitSeq = parametersBiLSTM.squeeze()
                 features.append(featuresFromCommitSeq)
-            if(cfg.checkCodeMetricsExists() and cfg.checkProcessMetricsExists()):
+            if(config.checkCodeMetricsExists() and config.checkProcessMetricsExists()):
                 featuresFromMetrics = torch.cat([codemetrics, processmetrics], dim=1)
                 for i in range(hp["metrics_numOfLayers"]):
                     featuresFromMetrics = self.componentsNetwork["codemetrics"]["linear"+str(i)](featuresFromMetrics)#todo codemetricsだけ？
                 features.append(featuresFromMetrics)
-            elif(cfg.checkProcessMetricsExists()):
+            elif(config.checkProcessMetricsExists()):
                 featuresFromMetrics = processmetrics
                 for i in range(hp["metrics_numOfLayers"]):
                     featuresFromMetrics = self.componentsNetwork["codemetrics"]["linear"+str(i)](featuresFromMetrics)
@@ -131,7 +122,7 @@ class Modeler(nn.Module):
         model = self.to(self.device)
         summary(model)
         return model
-    def getOptimizer(self, hp, model):
+    def defineOptimizer(self, hp, model):
         nameOptimizer = hp["optimizer"]
         if nameOptimizer == 'adam':
             lrAdam = hp["lrAdam"]
@@ -140,7 +131,7 @@ class Modeler(nn.Module):
             epsilonAdam = hp["epsilonAdam"]
             optimizer = torch.optim.Adam(model.parameters(), lr=lrAdam, betas=(beta_1Adam,beta_2Adam), eps=epsilonAdam)
         return optimizer
-    def train_(self, dataLoader, model, lossFunction, optimizer, numEpochs, isEarlyStopping):
+    def searchParameter(self, dataLoader, model, lossFunction, optimizer, numEpochs, isEarlyStopping):
         lossesTrain = []
         lossesValid = []
         accsTrain = []
@@ -159,17 +150,17 @@ class Modeler(nn.Module):
                 with tqdm(total=len(dataLoader[phase]),unit="batch") as pbar:
                     pbar.set_description(f"Epoch[{epoch}/{numEpochs}]({phase})")
                     for asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss, ys in dataLoader[phase]:
-                        if(cfg.checkASTExists()):
+                        if(config.checkASTExists()):
                             asts = asts.to(self.device)
-                        if(cfg.checkASTSeqExists()):
+                        if(config.checkASTSeqExists()):
                             astseqs = astseqs.to(self.device)
-                        if(cfg.checkCommitGraphExists()):
+                        if(config.checkCommitGraphExists()):
                             commitgraphs = commitgraphs.to(self.device)
-                        if(cfg.checkCommitSeqExists()):
+                        if(config.checkCommitSeqExists()):
                             commitseqs = commitseqs.to(self.device)
-                        if(cfg.checkCodeMetricsExists()):
+                        if(config.checkCodeMetricsExists()):
                             codemetricss = codemetricss.to(self.device)
-                        if(cfg.checkProcessMetricsExists()):
+                        if(config.checkProcessMetricsExists()):
                             processmetricss = processmetricss.to(self.device)
                         ys = ys.to(self.device)
                         ysPredicted = model(asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss)
@@ -206,69 +197,15 @@ class Modeler(nn.Module):
             if(isEarlyStopping and self.epochsEarlyStopping<epoch-epochBestValid):
                 break
         return epochBestValid, lossesTrain, lossesValid, accsTrain, accsValid
-    def test(self, datasets_Train_Test):
-        with open(cfg.pathHyperParameters, mode='r') as file:
-            hp = json.load(file)
-
-        IDRecord = [list(i) for i in zip(*datasets_Train_Test["test"])][0]
-        # prepare dataset
-        dataset4Test = datasets_Train_Test["test"]
-        dataloader={
-            "test": DataLoader(
-                dataset4Test,
-                batch_size = hp["sizeBatch"],
-                pin_memory=False,
-                collate_fn = dataset4Test.collate_fn
-            )
-        }
-
-        # prepare model architecture
-        model = self.defineNetwork(hp, dataset4Test)
-
-        # prepare model parameters
-        paramaters = torch.load(cfg.pathParameters)
-        model.load_state_dict(paramaters)
-        model = model.eval()
-
-        # predict ys
-        yPredicted = []
-        yTest = []
-        for asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss, ys in dataloader['test']:
-            if(cfg.checkASTExists()):
-                asts = asts.to(self.device)
-            if(cfg.checkASTSeqExists()):
-                astseqs = astseqs.to(self.device)
-            if(cfg.checkCommitGraphExists()):
-                commitgraphs = commitgraphs.to(self.device)
-            if(cfg.checkCommitSeqExists()):
-                commitseqs = commitseqs.to(self.device)
-            if(cfg.checkCodeMetricsExists()):
-                codemetricss = codemetricss.to(self.device)
-            if(cfg.checkProcessMetricsExists()):
-                processmetricss = processmetricss.to(self.device)
-            with torch.no_grad():
-                output = model(asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss)
-                sig = nn.Sigmoid()
-                output = sig(output)
-                yPredicted += [l for l in output.to("cpu").squeeze().tolist()]
-                yTest += [l for l in ys.to("cpu").squeeze().tolist()]
-
-        # output prediction result
-        resultTest = np.stack((IDRecord, yTest, yPredicted), axis=1)
-        with open(cfg.pathDirOutput+"/prediction.csv", 'w', newline="") as file:
-            csv.writer(file).writerows(resultTest)
-
-        # output recall, precision, f-measure, AUC
-        yPredicted = np.round(yPredicted, 0)
-        report = classification_report(yTest, yPredicted, output_dict=True)
-        report["AUC"] = roc_auc_score(yTest, yPredicted)
-        with open(cfg.pathDirOutput+"/report.json", 'w') as file:
-            json.dump(report, file, indent=4)
-
-        # output confusion matrics
-        cm = confusion_matrix(yTest, yPredicted)
-        sns.heatmap(cm, annot=True, cmap='Blues')
-        plt.savefig(cfg.pathDirOutput+"/ConfusionMatrix.png")
+    def loadHyperparameter(self):
+        if(config.hyperparameter):
+            return config.hyperparameter
+        elif(config.pathDatabaseOptuna):
+            # optuunaデータベースから、最適なハイパーパラメータを読み出す
+            study = optuna.create_study(study_name="optuna", storage='sqlite:///'+config.pathDirOutput + "/optuna.db", load_if_exists=True)
+            return dict(study.best_params.items()^study.best_trial.user_attrs.items())
+        else:
+            raise Exception()
     def plotGraphTraining(self, lossesTrain, lossesValid, accTrain, accValid, title):
         epochs = range(len(lossesTrain))
 
@@ -281,7 +218,7 @@ class Modeler(nn.Module):
         plt.title(title)
         plt.legend()
 
-        pathGraph = os.path.join(cfg.pathDirOutput, title + '.png')
+        pathGraph = os.path.join(config.pathDirOutput, title + '.png')
         fig.savefig(pathGraph)
         plt.clf()
         plt.close()
@@ -294,12 +231,14 @@ class Modeler(nn.Module):
         plt.plot(numOfTrials, trials, linestyle="-", color='b', label = 'lossTrain')
         plt.legend()
 
-        pathGraph = os.path.join(cfg.pathDirOutput, "hyperParameterSearch" + '.png')
+        pathGraph = os.path.join(config.pathDirOutput, "hyperParameterSearch" + '.png')
         fig.savefig(pathGraph)
         plt.clf()
         plt.close()
     def searchHyperParameter(self, datasets_Train_Valid):
+        logger.info("search hyper parameter")
         def objectiveFunction(trial):
+            logger.info("trial " + str(trial.number))
             numEpochs = 10000
             lossesCrossValidation=0
             for index4CrossValidation in range(len(datasets_Train_Valid)):
@@ -307,25 +246,25 @@ class Modeler(nn.Module):
                 dataset4Train = datasets_Train_Valid[index4CrossValidation]["train"]
                 dataset4Valid = datasets_Train_Valid[index4CrossValidation]["valid"]
                 hp = {}
-                if(cfg.checkASTExists()):
+                if(config.checkASTExists()):
                     pass
-                if(cfg.checkASTSeqExists()):
+                if(config.checkASTSeqExists()):
                     hp["astseq_numOfLayers"] = trial.suggest_int('astseq_numOfLayers', 1, 3)
                     hp["astseq_hiddenSize"] = trial.suggest_int('astseq_hiddenSize', 16, 256)
                     hp["astseq_rateDropout"] = trial.suggest_uniform('astseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('astseq_rateDropout', 0.0, 0.3)
-                if(cfg.checkCommitGraphExists()):
+                if(config.checkCommitGraphExists()):
                     pass
-                if(cfg.checkCommitSeqExists()):
+                if(config.checkCommitSeqExists()):
                     hp["commitseq_numOfLayers"] = trial.suggest_int('commitseq_numOfLayers', 1, 3)
                     hp["commitseq_hiddenSize"] = trial.suggest_int('commitseq_hiddenSize', 16, 256)
                     hp["commitseq_rateDropout"] = trial.suggest_uniform('commitseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('rateDropout', 0.0, 0.3)
-                if(cfg.checkCodeMetricsExists() or cfg.checkProcessMetricsExists()):
+                if(config.checkCodeMetricsExists() or config.checkProcessMetricsExists()):
                     hp["metrics_numOfLayers"] = trial.suggest_int('metrics_numOfLayers', 1, 3)
                     hp["metrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 16, 128)
                 else:
-                    if(cfg.checkCodeMetricsExists()):
+                    if(config.checkCodeMetricsExists()):
                         hp["codemetrics"] = {}
-                    if(cfg.checkProcessMetricsExists()):
+                    if(config.checkProcessMetricsExists()):
                         hp["processmetrics"] = {}
                 hp["optimizer"] = trial.suggest_categorical('optimizer', ['adam'])
                 hp["lrAdam"] = trial.suggest_loguniform('lrAdam', 1e-6, 1e-4)
@@ -355,10 +294,10 @@ class Modeler(nn.Module):
                 lossFunction = nn.BCEWithLogitsLoss()
 
                 # prepare  optimizer
-                optimizer = self.getOptimizer(hp, model)
+                optimizer = self.defineOptimizer(hp, model)
 
                 # train!
-                epochBestValid, lossesTrain, lossesValid, accsTrain, accsValid = self.train_(dataloader, model, lossFunction, optimizer, numEpochs, isEarlyStopping=True)
+                epochBestValid, lossesTrain, lossesValid, accsTrain, accsValid = self.searchParameter(dataloader, model, lossFunction, optimizer, numEpochs, isEarlyStopping=True)
                 self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, "graphTrainToValid_" + str(trial.number) + "_" + str(index4CrossValidation))
                 trial.set_user_attr("numEpochs", epochBestValid+1)
 
@@ -373,13 +312,10 @@ class Modeler(nn.Module):
                 loss = loss / 5
                 lossesCrossValidation += loss
             value2BeOptimized = lossesCrossValidation / len(datasets_Train_Valid)
-            #全体のログをloggerで出力
-            #with open(os.path.join(cfg.pathDirOutput, "logSearchHyperParameter.txt"), mode='a') as f:
-            #    f.write(str(score)+","+str(trial.datetime_start)+","+str(dict(trial.params, **trial.user_attrs))+'\n')
             return value2BeOptimized
-        study = optuna.create_study(study_name="optuna", storage='sqlite:///'+cfg.pathDirOutput + "/optuna.db", load_if_exists=True)
+        study = optuna.create_study(study_name="optuna", storage='sqlite:///'+config.pathDirOutput + "/optuna.db", load_if_exists=True)
         if(len(study.get_trials())==0):
-            if(cfg.checkCommitSeqExists() & cfg.checkASTSeqExists() & cfg.checkCodeMetricsExists() & cfg.checkProcessMetricsExists()):
+            if(config.checkCommitSeqExists() & config.checkASTSeqExists() & config.checkCodeMetricsExists() & config.checkProcessMetricsExists()):
                 hp_default = {
                     "astseq_numOfLayers": 2,
                     "astseq_hiddenSize": 128,
@@ -396,7 +332,7 @@ class Modeler(nn.Module):
                     "beta2Adam": 0.999,
                     "epsilonAdam": 1e-08
                 }
-            elif(cfg.checkCommitSeqExists() & cfg.checkASTSeqExists()):
+            elif(config.checkCommitSeqExists() & config.checkASTSeqExists()):
                 hp_default = {
                     "astseq_numOfLayers": 2,
                     "astseq_hiddenSize": 128,
@@ -411,7 +347,7 @@ class Modeler(nn.Module):
                     "beta2Adam": 0.999,
                     "epsilonAdam": 1e-08
                 }
-            elif(cfg.checkCodeMetricsExists() & cfg.checkProcessMetricsExists()):
+            elif(config.checkCodeMetricsExists() & config.checkProcessMetricsExists()):
                 hp_default = {
                     "metrics_numOfLayers": 2,
                     "metrics_numOfOutput": 64,
@@ -422,7 +358,7 @@ class Modeler(nn.Module):
                     "beta2Adam": 0.999,
                     "epsilonAdam": 1e-08
                 }
-            elif(cfg.checkCommitSeqExists()):
+            elif(config.checkCommitSeqExists()):
                 hp_default = {
                     "commitseq_numOfLayers": 2,
                     "commitseq_hiddenSize": 128,
@@ -434,7 +370,7 @@ class Modeler(nn.Module):
                     "beta2Adam": 0.999,
                     "epsilonAdam": 1e-08
                 }
-            elif(cfg.checkProcessMetricsExists()):
+            elif(config.checkProcessMetricsExists()):
                 hp_default = {
                     "metrics_numOfLayers": 2,
                     "metrics_numOfOutput": 64,
@@ -446,14 +382,15 @@ class Modeler(nn.Module):
                     "epsilonAdam": 1e-08
                 }
             study.enqueue_trial(hp_default)
-        study.optimize(objectiveFunction, timeout=cfg.period4HyperParameterSearch)
+        study.optimize(objectiveFunction, timeout=config.period4HyperParameterSearch)
         #save the hyperparameter that seems to be the best.
         self.plotGraphHyperParameterSearch(study.get_trials())
-        cfg.pathHyperParameters = os.path.join(cfg.pathDirOutput, "hyperParameter.json")
-        with open(cfg.pathHyperParameters, mode='w') as file:
+        config.pathHyperParameters = os.path.join(config.pathDirOutput, "hyperParameter.json")
+        with open(config.pathHyperParameters, mode='w') as file:
             json.dump(dict(study.best_params.items()^study.best_trial.user_attrs.items()), file, indent=4)
-    def searchParameter(self, datasets_Train_Test):
-        with open(cfg.pathHyperParameters, mode='r') as file:
+    def buildModel(self, datasets_Train_Test):
+        logger.info("search parameter")
+        with open(config.pathHyperParameters, mode='r') as file:
             hp = json.load(file)
 
         # prepare dataset
@@ -474,18 +411,83 @@ class Modeler(nn.Module):
             )
         }
 
-        # prepare model architecture
+        # prepare network architecture
         model = self.defineNetwork(hp, dataset4Train)
 
         # prepare loss function
         lossFunction = nn.BCEWithLogitsLoss()
 
         # prepare  optimizer
-        optimizer = self.getOptimizer(hp, model)
+        optimizer = self.defineOptimizer(hp, model)
 
         # prepare model parameters
-        _, lossesTrain, lossesValid, accsTrain, accsValid = self.train_(dataloader, model, lossFunction, optimizer, hp["numEpochs"], isEarlyStopping=False)
+        _, lossesTrain, lossesValid, accsTrain, accsValid = self.searchParameter(dataloader, model, lossFunction, optimizer, hp["numEpochs"], isEarlyStopping=False)
         self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, "graphTrainToTest")
 
-        cfg.pathParameters = os.path.join(cfg.pathDirOutput, "parameters")
-        torch.save(model.state_dict(), cfg.pathParameters)
+        config.pathParameters = os.path.join(config.pathDirOutput, "parameters")
+        torch.save(model.state_dict(), config.pathParameters)
+    def testModel(self, datasetTest):
+        logger.info("test parameter")
+
+        # get hyperparameter
+        hp = self.loadHyperparameter()
+
+        # get dataset
+        dataset4Test = datasetTest
+        dataloader={
+            "test": DataLoader(
+                dataset4Test,
+                batch_size = hp["sizeBatch"],
+                pin_memory=False,
+                collate_fn = dataset4Test.collate_fn
+            )
+        }
+
+        # define network architecture
+        model = self.defineNetwork(hp, dataset4Test)
+
+        # build model
+        paramaters = torch.load(config.pathParameters)
+        model.load_state_dict(paramaters)
+        model = model.eval()
+
+        # predict ys
+        yPredicted = []
+        yTest = []
+        for asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss, ys in dataloader['test']:
+            if(config.checkASTExists()):
+                asts = asts.to(self.device)
+            if(config.checkASTSeqExists()):
+                astseqs = astseqs.to(self.device)
+            if(config.checkCommitGraphExists()):
+                commitgraphs = commitgraphs.to(self.device)
+            if(config.checkCommitSeqExists()):
+                commitseqs = commitseqs.to(self.device)
+            if(config.checkCodeMetricsExists()):
+                codemetricss = codemetricss.to(self.device)
+            if(config.checkProcessMetricsExists()):
+                processmetricss = processmetricss.to(self.device)
+            with torch.no_grad():
+                output = model(asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss)
+                sig = nn.Sigmoid()
+                output = sig(output)
+                yPredicted += [l for l in output.to("cpu").squeeze().tolist()]
+                yTest += [l for l in ys.to("cpu").squeeze().tolist()]
+
+        # output prediction result
+        IDRecord = [list(i) for i in zip(*datasetTest)][0]
+        resultTest = np.stack((IDRecord, yTest, yPredicted), axis=1)
+        with open(config.pathDirOutput+"/prediction.csv", 'w', newline="") as file:
+            csv.writer(file).writerows(resultTest)
+
+        # output recall, precision, f-measure, AUC
+        yPredicted = np.round(yPredicted, 0)
+        report = classification_report(yTest, yPredicted, output_dict=True)
+        report["AUC"] = roc_auc_score(yTest, yPredicted)
+        with open(config.pathDirOutput+"/report.json", 'w') as file:
+            json.dump(report, file, indent=4)
+
+        # output confusion matrics
+        cm = confusion_matrix(yTest, yPredicted)
+        sns.heatmap(cm, annot=True, cmap='Blues')
+        plt.savefig(config.pathDirOutput+"/ConfusionMatrix.png")

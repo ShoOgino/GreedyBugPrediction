@@ -1,6 +1,8 @@
 from src.data.DataManeger import DataManeger
 from src.model.Modeler import Modeler
-from src.config.cfg import cfg
+from src.config.config import config
+from src.log.wrapperLogger import wrapperLogger
+logger = wrapperLogger.setup_logger(__name__, config.pathLog)
 
 import os
 import shutil
@@ -10,30 +12,29 @@ class Maneger:
         pass
 
     def run(self):
-        os.makedirs(cfg.pathDirOutput, exist_ok=True)
-        shutil.copy(cfg.pathConfigFile, cfg.pathDirOutput) #実験結果フォルダへ実行環境情報を保存
-        if(cfg.pathLogSearchHyperParameter!=""): #引き継ぐoptunaDBをコピー
-            shutil.copy(cfg.pathLogSearchHyperParameter, cfg.pathDirOutput)
+        os.makedirs(config.pathDirOutput, exist_ok=True)
+        # 実験結果フォルダへ実行コードを保存
+        shutil.copy(config.pathConfigFile, config.pathDirOutput)
+        # 引き継ぐoptunaDBをコピー
+        if(config.pathDatabaseOptuna!=None):
+            shutil.copy(config.pathDatabaseOptuna, config.pathDirOutput)
 
         # データ職人生成
         dataManeger = DataManeger()
-        dataManeger.setPathsSample(cfg.pathsSampleTrain, False)
-        dataManeger.setPathsSample(cfg.pathsSampleTest, True)
+        dataManeger.setPathsSample(config.pathsSampleTrain, False)
+        dataManeger.setPathsSample(config.pathsSampleTest, True)
         dataManeger.loadSamples()
 
         # モデル職人生成
         modeler = Modeler()
 
         # データ職人・モデル職人にタスクを移譲
-        if(cfg.checkPurposeContainsSearchHyperParameter()):
-            print("-----searchHyperParameter-----")
-            dataManeger.generateDatasetsTrainValid(isCrossValidation = cfg.isCrossValidation, numOfSplit = cfg.splitSize4CrossValidation)
+        if(config.checkPurposeContainsSearchHyperParameter()):
+            dataManeger.generateDatasetsTrainValid(isCrossValidation = config.isCrossValidation, numOfSplit = config.splitSize4CrossValidation)
             modeler.searchHyperParameter(dataManeger.datasets_Train_Valid)
-        if(cfg.checkPurposeContainsSearchParameter()):
-            print("-----searchParameter----------")
+        if(config.checkPurposeContainsBuildModel()):
             dataManeger.generateDatasetsTrainTest()
-            modeler.searchParameter(dataManeger.datasets_Train_Test)
-        if(cfg.checkPurposeContainsTest()):
-            print("-----test---------------------")
+            modeler.buildModel(dataManeger.datasets_Train_Test)
+        if(config.checkPurposeContainsTest()):
             dataManeger.generateDatasetsTrainTest()
-            modeler.test(dataManeger.datasets_Train_Test)
+            modeler.test(dataManeger.datasets_Train_Test["test"])

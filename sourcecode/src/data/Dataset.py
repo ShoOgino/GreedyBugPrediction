@@ -1,4 +1,4 @@
-from src.config.cfg import cfg
+from src.config.config import config
 import torch
 from torch.nn.utils.rnn import pad_sequence
 from torch.nn.utils.rnn import pack_padded_sequence
@@ -33,28 +33,28 @@ class Dataset(torch.utils.data.Dataset):
     def collate_fn(self, batch):
         ids, asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss, ys = list(zip(*batch))
 
-        if(cfg.checkASTExists()):
+        if(config.checkASTExists()):
             pass
 
-        if(cfg.checkASTSeqExists()):
+        if(config.checkASTSeqExists()):
             astseqs = [torch.tensor(astseq).float() for astseq in astseqs]
             astseqsLength = torch.tensor([len(astseq) for astseq in astseqs])
             astseqsPadded = pad_sequence(astseqs, batch_first=True)
             astseqs = pack_padded_sequence(astseqsPadded, astseqsLength, batch_first=True, enforce_sorted=False)
 
-        if(cfg.checkCodeMetricsExists()):
+        if(config.checkCodeMetricsExists()):
             codemetricss = torch.tensor(codemetricss).float()#[torch.tensor(codemetrics).float() for codemetrics in codemetricss]
 
-        if(cfg.checkCommitGraphExists()):
+        if(config.checkCommitGraphExists()):
             pass
 
-        if(cfg.checkCommitSeqExists()):
+        if(config.checkCommitSeqExists()):
             commitseqs = [torch.tensor(commitseq).float() for commitseq in commitseqs]
             commitseqsLength = torch.tensor([len(commitseq) for commitseq in commitseqs])
             commitseqsPadded = pad_sequence(commitseqs, batch_first=True)
             commitseqs = pack_padded_sequence(commitseqsPadded, commitseqsLength, batch_first=True, enforce_sorted=False)
 
-        if(cfg.checkProcessMetricsExists()):
+        if(config.checkProcessMetricsExists()):
             processmetricss = torch.tensor(processmetricss).float()
 
         # yについて

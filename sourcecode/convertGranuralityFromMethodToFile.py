@@ -56,11 +56,11 @@ def reformat(pathDataset):
             for commitOnFileOnIdcommit in commitOnFilesBefore[idCommit]:
                 commitOnFile["stmtAdded"]   += commitOnFileOnIdcommit["stmtAdded"]
                 commitOnFile["stmtDeleted"] += commitOnFileOnIdcommit["stmtDeleted"]
-                commitOnFile["churn"]       += commitOnFileOnIdcommit["churn"]       
-                commitOnFile["decl"]        += commitOnFileOnIdcommit["decl"]        
-                commitOnFile["cond"]        += commitOnFileOnIdcommit["cond"]        
-                commitOnFile["elseAdded"]   += commitOnFileOnIdcommit["elseAdded"]   
-                commitOnFile["elseDeleted"] += commitOnFileOnIdcommit["elseDeleted"] 
+                commitOnFile["churn"]       += commitOnFileOnIdcommit["churn"]
+                commitOnFile["decl"]        += commitOnFileOnIdcommit["decl"]
+                commitOnFile["cond"]        += commitOnFileOnIdcommit["cond"]
+                commitOnFile["elseAdded"]   += commitOnFileOnIdcommit["elseAdded"]
+                commitOnFile["elseDeleted"] += commitOnFileOnIdcommit["elseDeleted"]
             commitOnFilesAfter.append(commitOnFile)
         files[idFile]["commitOnFiles"] = sorted(commitOnFilesAfter, key=lambda x:x["date"])#5. 新しい変更ベクトル列を時間順にソートする
     #6. 新しい変更ベクトル列からメトリクスを算出する。
