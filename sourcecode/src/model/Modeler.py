@@ -268,6 +268,7 @@ class Modeler(nn.Module):
         def objectiveFunction(trial):
             logger.info("trial " + str(trial.number) + "started")
             listLossesValid=[]
+            listEpochs=[]
             # prepare hyperparameter
             hp = {
                 "optimizer": trial.suggest_categorical('optimizer', ['adam']),
@@ -275,7 +276,7 @@ class Modeler(nn.Module):
                 "beta1Adam": trial.suggest_uniform('beta1Adam', 0.9, 0.9), #trial.suggest_uniform('beta1Adam', 0.9, 1)
                 "beta2Adam": trial.suggest_uniform('beta2Adam', 0.999, 0.999), #trial.suggest_uniform('beta2Adam', 0.999, 1)
                 "epsilonAdam": trial.suggest_loguniform('epsilonAdam', 1e-8, 1e-8), #trial.suggest_loguniform('epsilonAdam', 1e-10, 1e-8)
-                "sizeBatch": trial.suggest_int('sizeBatch', 128, 128) #trial.suggest_int('sizeBatch', 16, 128)
+                "sizeBatch": trial.suggest_int('sizeBatch', len(datasets_Train_Valid[0]["train"]) // 100, len(datasets_Train_Valid[0]["train"]) // 100)
             }
             if(config.checkASTExists()):
                 pass
@@ -322,48 +323,54 @@ class Modeler(nn.Module):
                 }
                 # build model
                 self.initParameter()
-                _, lossesTrain, lossesValid, accsTrain, accsValid = self.searchParameter(
+                epochBestValid, lossesTrain, lossesValid, accsTrain, accsValid = self.searchParameter(
                     dataLoader = dataloader,
                     model = model,
                     lossFunction = lossFunction,
                     optimizer = optimizer,
                     numEpochs = 10000,
-                    isEarlyStopping=True
+                    isEarlyStopping=config.epochs4EarlyStopping
                 )
                 listLossesValid.append(lossesValid)
+                listEpochs.append(epochBestValid)
                 self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, "graphTrainToValid_" + str(trial.number) + "_" + str(index4CrossValidation))
             # 最適なnumEpochsと、その時のハイパーパラメータの評価値を特定する。
-            sumOfSquaresBest = 10000
-            numEpochsBest = 10000
-            for epoch in range(min([len(item) for item in listLossesValid]) - 5):
-                listLossValid = []
-                # 1エポックだけ偶然高い精度が出たような場合を弾くために、前後のepochで平均を取る。
-                for lossesValid in listLossesValid:
-                    temp = 0
-                    for i in range (5):
-                        temp += lossesValid[epoch+i]
-                    temp = temp/5
-                    listLossValid.append(temp)
-                # 二乗の和
-                sumOfSquares = 0
-                for lossValid in listLossValid:
-                    sumOfSquares+=lossValid*lossValid
-                if(sumOfSquares<sumOfSquaresBest):
-                    sumOfSquaresBest = sumOfSquares
-                    numEpochsBest = epoch
+            #sumOfSquaresBest = 10000
+            #numEpochsBest = 10000
+            #for epoch in range(min([len(item) for item in listLossesValid]) - 5):
+            #    listLossValid = []
+            #    # 1エポックだけ偶然高い精度が出たような場合を弾くために、前後のepochで平均を取る。
+            #    for lossesValid in listLossesValid:
+            #        temp = 0
+            #        for i in range (5):
+            #            temp += lossesValid[epoch+i]
+            #        temp = temp/5
+            #        listLossValid.append(temp)
+            #    # 二乗の和
+            #    sumOfSquares = 0
+            #    for lossValid in listLossValid:
+            #        sumOfSquares+=lossValid*lossValid
+            #    if(sumOfSquares<sumOfSquaresBest):
+            #        sumOfSquaresBest = sumOfSquares
+            #        numEpochsBest = epoch
+            numEpochsBest=sum(listEpochs)//len(listEpochs)
             trial.set_user_attr("numEpochs", numEpochsBest)
+            sumOfSquare=0
+            for i,numEpochs in enumerate(listEpochs):
+                temp = sum(listLossesValid[i][numEpochs:numEpochs+5])/5
+                sumOfSquare += temp * temp
             logger.info(
                 "trial " + str(trial.number) + " end" + "\n" +
-                "value: " + str(sumOfSquaresBest) + "\n" +
+                "value: " + str(sumOfSquare) + "\n" +
                 str(dict(**hp, **{"numEpochs":numEpochsBest})).replace("\'", "\"")
             )
-            return sumOfSquaresBest
+            return sumOfSquare
         logger.info("hyperparameter search started")
         config.pathDatabaseOptuna = config.pathDatabaseOptuna or config.pathDirOutput + "/optuna.db"
         study = optuna.create_study(study_name="optuna", storage='sqlite:///'+config.pathDatabaseOptuna, load_if_exists=True)
         if(len(study.get_trials())==0):
             hp_default = {
-                "sizeBatch": 128,
+                "sizeBatch": len(datasets_Train_Valid[0]["train"])//100,
                 "optimizer": "adam",
                 "lrAdam": 1e-05,
                 "beta1Adam": 0.9,
