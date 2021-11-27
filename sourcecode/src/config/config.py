@@ -8,8 +8,8 @@ class config:
     pathConfigFile = None
     purpose = None
     typesInput = None
-    pathsSampleTrain = None # list
-    pathsSampleTest = None # list
+    pathsDirSampleTrain = None # list
+    pathsDirSampleTest = None # list
     isCrossValidation = None
     splitSize4CrossValidation = None
     epochs4EarlyStopping = None

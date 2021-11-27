@@ -1,5 +1,7 @@
 from src.config.config import config
 from src.data.Dataset import Dataset
+from src.log.wrapperLogger import wrapperLogger
+logger = wrapperLogger.setup_logger(__name__, config.pathLog)
 
 import glob
 import json
@@ -18,14 +20,14 @@ class DataManeger(torch.utils.data.Dataset):
         self.datasets_Train_Valid = []
         self.datasets_Train_Test = {}
         self.selectedInputData = config.typesInput
-    def setPathsSample(self, pathDir, isForTest=False):
+    def setPathsSample(self, *, pathsDir, isForTest):
         if(isForTest):
-            for path in pathDir:
+            for path in pathsDir:
                 if(os.path.isdir(path)):
                     pathsSearched = glob.glob(path+"/**/*.json", recursive=True)
                     self.pathsSample4Test.extend(pathsSearched)
         else:
-            for path in pathDir:
+            for path in pathsDir:
                 if(os.path.isdir(path)):
                     pathsSearched = glob.glob(path+"/**/*.json", recursive=True)
                     self.pathsSample4Train.extend(pathsSearched)
@@ -306,7 +308,13 @@ class DataManeger(torch.utils.data.Dataset):
             loadSample(pathSample4Train, self.samples4Train, map2StandardizeMetricsCommit, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
         for pathSample4Test in self.pathsSample4Test:
             loadSample(pathSample4Test, self.samples4Test, map2StandardizeMetricsCommit, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
-    def generateDatasetsTrainValid(self, isCrossValidation = False, numOfSplit = 5):
+        logger.info( "\n" +
+            "samples4TrainPositive: "+ str(self.getNumOfSamples4TrainPositive()) + "\n" +
+            "samples4TrainNegative: "+ str(self.getNumOfSamples4TrainNegative()) + "\n" +
+            "samples4TestPositive: "+ str(self.getNumOfSamples4TestPositive()) + "\n" +
+            "samples4TestNegative: "+ str(self.getNumOfSamples4TestNegative())
+        )
+    def generateDatasetsTrainValid(self, *, isCrossValidation, numOfSplit):
         samplesBuggy    = []
         samplesNotBuggy = []
         for data in self.samples4Train:
@@ -359,6 +367,11 @@ class DataManeger(torch.utils.data.Dataset):
         dataset_Train_Test["train"] = Dataset(dataset4Train)
         dataset_Train_Test["test"] = Dataset(dataset4Test)
         self.datasets_Train_Test = dataset_Train_Test
-    def showSummary(self):
-        print(" len(samples4Train): " + str(len(self.samples4Train)))
-        print(" len(samples4Test): " + str(len(self.samples4Test)))
+    def getNumOfSamples4TrainPositive(self):
+        return len([sample for sample in self.samples4Train if sample["y"]==1])
+    def getNumOfSamples4TrainNegative(self):
+        return len([sample for sample in self.samples4Train if sample["y"]==0])
+    def getNumOfSamples4TestPositive(self):
+        return len([sample for sample in self.samples4Test if sample["y"]==1])
+    def getNumOfSamples4TestNegative(self):
+        return len([sample for sample in self.samples4Test if sample["y"]==0])

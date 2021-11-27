@@ -21,8 +21,8 @@ class Maneger:
 
         # データ職人生成
         dataManeger = DataManeger()
-        dataManeger.setPathsSample(config.pathsSampleTrain, False)
-        dataManeger.setPathsSample(config.pathsSampleTest, True)
+        dataManeger.setPathsSample(pathsDir = config.pathsDirSampleTrain, isForTest = False)
+        dataManeger.setPathsSample(pathsDir = config.pathsDirSampleTest, isForTest = True)
         dataManeger.loadSamples()
 
         # モデル職人生成
@@ -35,6 +35,6 @@ class Maneger:
         if(config.checkPurposeContainsBuildModel()):
             dataManeger.generateDatasetsTrainTest()
             modeler.buildModel(dataManeger.datasets_Train_Test)
-        if(config.checkPurposeContainsTest()):
+        if(config.checkPurposeContainsTestModel()):
             dataManeger.generateDatasetsTrainTest()
-            modeler.test(dataManeger.datasets_Train_Test["test"])
+            modeler.testModel(dataManeger.datasets_Train_Test["test"])

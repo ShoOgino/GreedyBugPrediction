@@ -1,9 +1,12 @@
 from src.config.config import config
 from src.data.Dataset import Dataset
+from src.log.wrapperLogger import wrapperLogger
+logger = wrapperLogger.setup_logger(__name__, config.pathLog)
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
 import optuna
+optuna.logging.set_verbosity(optuna.logging.CRITICAL)
 import numpy as np
 import os
 import csv
@@ -16,8 +19,6 @@ from tqdm import tqdm
 from sklearn.metrics import mean_squared_error, classification_report
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score
-from src.log.wrapperLogger import wrapperLogger
-logger = wrapperLogger.setup_logger(__name__, config.pathLog)
 
 class Modeler(nn.Module):
     def __init__(self):
@@ -29,7 +30,6 @@ class Modeler(nn.Module):
         torch.backends.cudnn.enabled = True
         self.forward = None
     def defineNetwork(self, hp, dataset):
-        print(hp)
         numOfFeatures = 0
         self.componentsNetwork = nn.ModuleDict(
             {
@@ -39,7 +39,7 @@ class Modeler(nn.Module):
                 "commitgraph":nn.ModuleDict(),
                 "commitseq": nn.ModuleDict(),
                 "processmetrics":nn.ModuleDict(),
-                "metrics": nn.ModuleDict()
+                "features": nn.ModuleDict()
             }
         )
         if(config.checkASTExists()):
@@ -76,14 +76,26 @@ class Modeler(nn.Module):
             else:
                 numOfFeatures_commitseq = hp["commitseq_hiddenSize"]
             numOfFeatures += numOfFeatures_commitseq
-        if(config.checkCodeMetricsExists() or config.checkProcessMetricsExists()):
-            numOfFeaturesMetrics = len(dataset.codemetricss[0])+len(dataset.processmetricss[0])
+        if(config.checkCodeMetricsExists()):
+            numOfFeaturesMetrics = len(dataset.codemetricss[0])
             for i in range(hp["metrics_numOfLayers"]):
                 if( i == 0 ):
                     in_features = numOfFeaturesMetrics
                 else:
                     in_features = hp["metrics_numOfOutput"]
                 self.componentsNetwork["codemetrics"]["linear"+str(i)] = nn.Linear(
+                    in_features = in_features,
+                    out_features = hp["metrics_numOfOutput"]
+                )
+            numOfFeatures += hp["metrics_numOfOutput"]
+        if(config.checkProcessMetricsExists()):
+            numOfFeaturesMetrics = len(dataset.processmetricss[0])
+            for i in range(hp["metrics_numOfLayers"]):
+                if( i == 0 ):
+                    in_features = numOfFeaturesMetrics
+                else:
+                    in_features = hp["metrics_numOfOutput"]
+                self.componentsNetwork["processmetrics"]["linear"+str(i)] = nn.Linear(
                     in_features = in_features,
                     out_features = hp["metrics_numOfOutput"]
                 )
@@ -105,23 +117,44 @@ class Modeler(nn.Module):
                 parametersBiLSTM = torch.cat(torch.split(parametersBiLSTM[(hp["commitseq_numOfLayers"]-1)*2:], 1), dim=2)
                 featuresFromCommitSeq = parametersBiLSTM.squeeze()
                 features.append(featuresFromCommitSeq)
-            if(config.checkCodeMetricsExists() and config.checkProcessMetricsExists()):
-                featuresFromMetrics = torch.cat([codemetrics, processmetrics], dim=1)
+            if(config.checkCodeMetricsExists()):
                 for i in range(hp["metrics_numOfLayers"]):
-                    featuresFromMetrics = self.componentsNetwork["codemetrics"]["linear"+str(i)](featuresFromMetrics)#todo codemetricsだけ？
+                    featuresFromMetrics = self.componentsNetwork["codemetrics"]["linear"+str(i)](codemetrics)
                 features.append(featuresFromMetrics)
-            elif(config.checkProcessMetricsExists()):
-                featuresFromMetrics = processmetrics
+            if(config.checkProcessMetricsExists()):
                 for i in range(hp["metrics_numOfLayers"]):
-                    featuresFromMetrics = self.componentsNetwork["codemetrics"]["linear"+str(i)](featuresFromMetrics)
+                    featuresFromMetrics = self.componentsNetwork["processmetrics"]["linear"+str(i)](processmetrics)
                 features.append(featuresFromMetrics)
             features = torch.cat(features, dim = 1)
             y = self.componentsNetwork["features"](features)
             return y
         self.forward = forward
         model = self.to(self.device)
-        summary(model)
         return model
+    def initParameter(self):
+        if(config.checkASTExists()):
+            pass
+        if(config.checkASTSeqExists()):
+            for name, param in self.componentsNetwork["astseq"]["LSTM"].named_parameters():
+                if 'bias' in name:
+                   nn.init.constant(param, 0.0)
+                elif 'weight' in name:
+                   nn.init.xavier_normal(param)
+        if(config.checkCommitGraphExists()):
+            pass
+        if(config.checkCommitSeqExists()):
+            for name, param in self.componentsNetwork["commitseq"]["LSTM"].named_parameters():
+                if 'bias' in name:
+                   nn.init.constant(param, 0.0)
+                elif 'weight' in name:
+                   nn.init.xavier_normal(param)
+        if(config.checkCodeMetricsExists()):
+            for layer in nn.init.normal_(self.componentsNetwork["codemetrics"]):
+                nn.init.normal_(layer.weight, 0.0, 1.0)
+        if(config.checkProcessMetricsExists()):
+            for layer in nn.init.normal_(self.componentsNetwork["processmetrics"]):
+                nn.init.normal_(layer.weight, 0.0, 1.0)
+        nn.init.normal_(self.componentsNetwork["features"].weight, 0.0, 1.0)
     def defineOptimizer(self, hp, model):
         nameOptimizer = hp["optimizer"]
         if nameOptimizer == 'adam':
@@ -131,7 +164,7 @@ class Modeler(nn.Module):
             epsilonAdam = hp["epsilonAdam"]
             optimizer = torch.optim.Adam(model.parameters(), lr=lrAdam, betas=(beta_1Adam,beta_2Adam), eps=epsilonAdam)
         return optimizer
-    def searchParameter(self, dataLoader, model, lossFunction, optimizer, numEpochs, isEarlyStopping):
+    def searchParameter(self, *, dataLoader, model, lossFunction, optimizer, numEpochs, isEarlyStopping):
         lossesTrain = []
         lossesValid = []
         accsTrain = []
@@ -147,43 +180,37 @@ class Modeler(nn.Module):
                 loss_sum=0
                 corrects=0
                 total=0
-                with tqdm(total=len(dataLoader[phase]),unit="batch") as pbar:
-                    pbar.set_description(f"Epoch[{epoch}/{numEpochs}]({phase})")
-                    for asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss, ys in dataLoader[phase]:
-                        if(config.checkASTExists()):
-                            asts = asts.to(self.device)
-                        if(config.checkASTSeqExists()):
-                            astseqs = astseqs.to(self.device)
-                        if(config.checkCommitGraphExists()):
-                            commitgraphs = commitgraphs.to(self.device)
-                        if(config.checkCommitSeqExists()):
-                            commitseqs = commitseqs.to(self.device)
-                        if(config.checkCodeMetricsExists()):
-                            codemetricss = codemetricss.to(self.device)
-                        if(config.checkProcessMetricsExists()):
-                            processmetricss = processmetricss.to(self.device)
-                        ys = ys.to(self.device)
-                        ysPredicted = model(asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss)
-                        ysPredicted = ysPredicted.squeeze()
-                        ys = ys.squeeze()
-                        loss=lossFunction(ysPredicted, ys)
+                for asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss, ys in dataLoader[phase]:
+                    if(config.checkASTExists()):
+                        asts = asts.to(self.device)
+                    if(config.checkASTSeqExists()):
+                        astseqs = astseqs.to(self.device)
+                    if(config.checkCommitGraphExists()):
+                        commitgraphs = commitgraphs.to(self.device)
+                    if(config.checkCommitSeqExists()):
+                        commitseqs = commitseqs.to(self.device)
+                    if(config.checkCodeMetricsExists()):
+                        codemetricss = codemetricss.to(self.device)
+                    if(config.checkProcessMetricsExists()):
+                        processmetricss = processmetricss.to(self.device)
+                    ys = ys.to(self.device)
+                    ysPredicted = model(asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss)
+                    ysPredicted = ysPredicted.squeeze()
+                    ys = ys.squeeze()
+                    loss=lossFunction(ysPredicted, ys)
 
-                        if phase=="train":
-                            optimizer.zero_grad()
-                            loss.backward()
-                            optimizer.step()
+                    if phase=="train":
+                        optimizer.zero_grad()
+                        loss.backward()
+                        optimizer.step()
 
-                        sig = nn.Sigmoid()
-                        ysPredicted =  torch.round(sig(ysPredicted))
-                        corrects+=int((ysPredicted==ys).sum())
-                        total+=ys.size(0)
-                        accuracy = corrects/total
-                        #loss関数で通してでてきたlossはCrossEntropyLossのreduction="mean"なので平均
-                        #batch sizeをかけることで、batch全体での合計を今までのloss_sumに足し合わせる
-                        loss_sum += float(loss) * ys.size(0)
-                        running_loss = loss_sum/total
-                        pbar.set_postfix({"loss":running_loss,"accuracy":accuracy })
-                        pbar.update(1)
+                    sig = nn.Sigmoid()
+                    ysPredicted =  torch.round(sig(ysPredicted))
+                    corrects+=int((ysPredicted==ys).sum())
+                    total+=ys.size(0)
+                    #loss関数で通してでてきたlossはCrossEntropyLossのreduction="mean"なので平均
+                    #batch sizeをかけることで、batch全体での合計を今までのloss_sumに足し合わせる
+                    loss_sum += float(loss) * ys.size(0)
                 if(phase == "train"):
                     lossesTrain.append(loss_sum/total)
                     accsTrain.append(corrects/total)
@@ -191,7 +218,6 @@ class Modeler(nn.Module):
                     lossesValid.append(loss_sum/total)
                     accsValid.append(corrects/total)
                     if(loss_sum < lossValidBest):
-                        print("update!")
                         lossValidBest = loss_sum
                         epochBestValid = epoch
             if(isEarlyStopping and self.epochsEarlyStopping<epoch-epochBestValid):
@@ -201,12 +227,14 @@ class Modeler(nn.Module):
         if(config.hyperparameter):
             return config.hyperparameter
         elif(config.pathDatabaseOptuna):
-            # optuunaデータベースから、最適なハイパーパラメータを読み出す
+            # optunaデータベースから、最適なハイパーパラメータを読み出す
             study = optuna.create_study(study_name="optuna", storage='sqlite:///'+config.pathDirOutput + "/optuna.db", load_if_exists=True)
             return dict(study.best_params.items()^study.best_trial.user_attrs.items())
         else:
+            logger.error("Hyperparameter can't be loaded. config.hyperparameter or config.pathDatabaseOptuna are not defined")
             raise Exception()
     def plotGraphTraining(self, lossesTrain, lossesValid, accTrain, accValid, title):
+        # todo: lossが最小値のところに縦線・横線を引く
         epochs = range(len(lossesTrain))
 
         fig = plt.figure()
@@ -223,6 +251,7 @@ class Modeler(nn.Module):
         plt.clf()
         plt.close()
     def plotGraphHyperParameterSearch(self, trials):
+        # todo: lossが最小値のところに縦線・横線を引く
         numOfTrials = range(len(trials))
 
         fig = plt.figure()
@@ -236,42 +265,47 @@ class Modeler(nn.Module):
         plt.clf()
         plt.close()
     def searchHyperParameter(self, datasets_Train_Valid):
-        logger.info("search hyper parameter")
         def objectiveFunction(trial):
-            logger.info("trial " + str(trial.number))
-            numEpochs = 10000
-            lossesCrossValidation=0
+            logger.info("trial " + str(trial.number) + "started")
+            listLossesValid=[]
+            # prepare hyperparameter
+            hp = {
+                "optimizer": trial.suggest_categorical('optimizer', ['adam']),
+                "lrAdam": trial.suggest_loguniform('lrAdam', 1e-6, 1e-4),
+                "beta1Adam": trial.suggest_uniform('beta1Adam', 0.9, 0.9), #trial.suggest_uniform('beta1Adam', 0.9, 1)
+                "beta2Adam": trial.suggest_uniform('beta2Adam', 0.999, 0.999), #trial.suggest_uniform('beta2Adam', 0.999, 1)
+                "epsilonAdam": trial.suggest_loguniform('epsilonAdam', 1e-8, 1e-8), #trial.suggest_loguniform('epsilonAdam', 1e-10, 1e-8)
+                "sizeBatch": trial.suggest_int('sizeBatch', 128, 128) #trial.suggest_int('sizeBatch', 16, 128)
+            }
+            if(config.checkASTExists()):
+                pass
+            if(config.checkASTSeqExists()):
+                hp["astseq_numOfLayers"] = trial.suggest_int('astseq_numOfLayers', 1, 3)
+                hp["astseq_hiddenSize"] = trial.suggest_int('astseq_hiddenSize', 16, 256)
+                hp["astseq_rateDropout"] = trial.suggest_uniform('astseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('astseq_rateDropout', 0.0, 0.3)
+            if(config.checkCommitGraphExists()):
+                pass
+            if(config.checkCommitSeqExists()):
+                hp["commitseq_numOfLayers"] = trial.suggest_int('commitseq_numOfLayers', 1, 3)
+                hp["commitseq_hiddenSize"] = trial.suggest_int('commitseq_hiddenSize', 16, 256)
+                hp["commitseq_rateDropout"] = trial.suggest_uniform('commitseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('rateDropout', 0.0, 0.3)
+            if(config.checkCodeMetricsExists()):
+                hp["codemetrics_numOfLayers"] = trial.suggest_int('metrics_numOfLayers', 1, 3)
+                hp["codemetrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 16, 128)
+            if(config.checkProcessMetricsExists()):
+                hp["processmetrics_numOfLayers"] = trial.suggest_int('metrics_numOfLayers', 1, 3)
+                hp["processmetrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 16, 128)
+            # prepare model architecture
+            model = self.defineNetwork(hp, datasets_Train_Valid[0]["train"])
+            # prepare loss function
+            lossFunction = nn.BCEWithLogitsLoss()
+            # prepare  optimizer
+            optimizer = self.defineOptimizer(hp, model)
             for index4CrossValidation in range(len(datasets_Train_Valid)):
+                logger.info("cross validation " + str(index4CrossValidation+1) + "/" + str(len(datasets_Train_Valid)))
                 # prepare dataset
                 dataset4Train = datasets_Train_Valid[index4CrossValidation]["train"]
                 dataset4Valid = datasets_Train_Valid[index4CrossValidation]["valid"]
-                hp = {}
-                if(config.checkASTExists()):
-                    pass
-                if(config.checkASTSeqExists()):
-                    hp["astseq_numOfLayers"] = trial.suggest_int('astseq_numOfLayers', 1, 3)
-                    hp["astseq_hiddenSize"] = trial.suggest_int('astseq_hiddenSize', 16, 256)
-                    hp["astseq_rateDropout"] = trial.suggest_uniform('astseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('astseq_rateDropout', 0.0, 0.3)
-                if(config.checkCommitGraphExists()):
-                    pass
-                if(config.checkCommitSeqExists()):
-                    hp["commitseq_numOfLayers"] = trial.suggest_int('commitseq_numOfLayers', 1, 3)
-                    hp["commitseq_hiddenSize"] = trial.suggest_int('commitseq_hiddenSize', 16, 256)
-                    hp["commitseq_rateDropout"] = trial.suggest_uniform('commitseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('rateDropout', 0.0, 0.3)
-                if(config.checkCodeMetricsExists() or config.checkProcessMetricsExists()):
-                    hp["metrics_numOfLayers"] = trial.suggest_int('metrics_numOfLayers', 1, 3)
-                    hp["metrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 16, 128)
-                else:
-                    if(config.checkCodeMetricsExists()):
-                        hp["codemetrics"] = {}
-                    if(config.checkProcessMetricsExists()):
-                        hp["processmetrics"] = {}
-                hp["optimizer"] = trial.suggest_categorical('optimizer', ['adam'])
-                hp["lrAdam"] = trial.suggest_loguniform('lrAdam', 1e-6, 1e-4)
-                hp["beta1Adam"] = trial.suggest_uniform('beta1Adam', 0.9, 0.9)#trial.suggest_uniform('beta1Adam', 0.9, 1)
-                hp["beta2Adam"] = trial.suggest_uniform('beta2Adam', 0.999, 0.999)#trial.suggest_uniform('beta2Adam', 0.999, 1)
-                hp["epsilonAdam"] = trial.suggest_loguniform('epsilonAdam', 1e-8, 1e-8) #trial.suggest_loguniform('epsilonAdam', 1e-10, 1e-8)
-                hp["sizeBatch"] = trial.suggest_int('sizeBatch', 128, 128) #trial.suggest_int('sizeBatch', 16, 128)
                 dataloader={
                     "train": DataLoader(
                         dataset4Train,
@@ -286,112 +320,90 @@ class Modeler(nn.Module):
                         collate_fn= dataset4Valid.collate_fn
                     )
                 }
-
-                # prepare model architecture
-                model = self.defineNetwork(hp, dataset4Train)
-
-                # prepare loss function
-                lossFunction = nn.BCEWithLogitsLoss()
-
-                # prepare  optimizer
-                optimizer = self.defineOptimizer(hp, model)
-
-                # train!
-                epochBestValid, lossesTrain, lossesValid, accsTrain, accsValid = self.searchParameter(dataloader, model, lossFunction, optimizer, numEpochs, isEarlyStopping=True)
+                # build model
+                self.initParameter()
+                _, lossesTrain, lossesValid, accsTrain, accsValid = self.searchParameter(
+                    dataLoader = dataloader,
+                    model = model,
+                    lossFunction = lossFunction,
+                    optimizer = optimizer,
+                    numEpochs = 10000,
+                    isEarlyStopping=True
+                )
+                listLossesValid.append(lossesValid)
                 self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, "graphTrainToValid_" + str(trial.number) + "_" + str(index4CrossValidation))
-                trial.set_user_attr("numEpochs", epochBestValid+1)
-
+            # 最適なnumEpochsと、その時のハイパーパラメータの評価値を特定する。
+            sumOfSquaresBest = 10000
+            numEpochsBest = 10000
+            for epoch in range(min([len(item) for item in listLossesValid]) - 5):
+                listLossValid = []
                 # 1エポックだけ偶然高い精度が出たような場合を弾くために、前後のepochで平均を取る。
-                lossValMin = min(lossesValid)
-                indexValMin = lossesValid.index(lossValMin)
-                indexLast = len(lossesValid)-1
-                index4Forward = indexValMin+4 if indexValMin+4 < indexLast else indexLast
-                loss=0
-                for i in range(5):
-                    loss += lossesValid[index4Forward-i]
-                loss = loss / 5
-                lossesCrossValidation += loss
-            value2BeOptimized = lossesCrossValidation / len(datasets_Train_Valid)
-            return value2BeOptimized
-        study = optuna.create_study(study_name="optuna", storage='sqlite:///'+config.pathDirOutput + "/optuna.db", load_if_exists=True)
+                for lossesValid in listLossesValid:
+                    temp = 0
+                    for i in range (5):
+                        temp += lossesValid[epoch+i]
+                    temp = temp/5
+                    listLossValid.append(temp)
+                # 二乗の和
+                sumOfSquares = 0
+                for lossValid in listLossValid:
+                    sumOfSquares+=lossValid*lossValid
+                if(sumOfSquares<sumOfSquaresBest):
+                    sumOfSquaresBest = sumOfSquares
+                    numEpochsBest = epoch
+            trial.set_user_attr("numEpochs", numEpochsBest)
+            logger.info(
+                "trial " + str(trial.number) + " end" + "\n" +
+                "value: " + str(sumOfSquaresBest) + "\n" +
+                str(dict(**hp, **{"numEpochs":numEpochsBest})).replace("\'", "\"")
+            )
+            return sumOfSquaresBest
+        logger.info("hyperparameter search started")
+        config.pathDatabaseOptuna = config.pathDatabaseOptuna or config.pathDirOutput + "/optuna.db"
+        study = optuna.create_study(study_name="optuna", storage='sqlite:///'+config.pathDatabaseOptuna, load_if_exists=True)
         if(len(study.get_trials())==0):
-            if(config.checkCommitSeqExists() & config.checkASTSeqExists() & config.checkCodeMetricsExists() & config.checkProcessMetricsExists()):
-                hp_default = {
+            hp_default = {
+                "sizeBatch": 128,
+                "optimizer": "adam",
+                "lrAdam": 1e-05,
+                "beta1Adam": 0.9,
+                "beta2Adam": 0.999,
+                "epsilonAdam": 1e-08
+            }
+            if(config.checkCommitSeqExists()):
+                hp_default_commitseq ={
+                    "commitseq_numOfLayers": 2,
+                    "commitseq_hiddenSize": 128,
+                    "commitseq_rateDropout": 0.0,
+                }
+                hp_default = dict(**hp_default, **hp_default_commitseq)
+            if(config.checkASTSeqExists()):
+                hp_default_ASTSeq ={
                     "astseq_numOfLayers": 2,
                     "astseq_hiddenSize": 128,
                     "astseq_rateDropout": 0.0,
-                    "commitseq_numOfLayers": 2,
-                    "commitseq_hiddenSize": 128,
-                    "commitseq_rateDropout": 0.0,
-                    "metrics_numOfLayers": 2,
-                    "metrics_numOfOutput": 64,
-                    "sizeBatch": 128,
-                    "optimizer": "adam",
-                    "lrAdam": 1e-05,
-                    "beta1Adam": 0.9,
-                    "beta2Adam": 0.999,
-                    "epsilonAdam": 1e-08
                 }
-            elif(config.checkCommitSeqExists() & config.checkASTSeqExists()):
-                hp_default = {
-                    "astseq_numOfLayers": 2,
-                    "astseq_hiddenSize": 128,
-                    "astseq_rateDropout": 0.0,
-                    "commitseq_numOfLayers": 2,
-                    "commitseq_hiddenSize": 128,
-                    "commitseq_rateDropout": 0.0,
-                    "sizeBatch": 128,
-                    "optimizer": "adam",
-                    "lrAdam": 1e-05,
-                    "beta1Adam": 0.9,
-                    "beta2Adam": 0.999,
-                    "epsilonAdam": 1e-08
+                hp_default = dict(**hp_default, **hp_default_ASTSeq)
+            if(config.checkCodeMetricsExists()):
+                hp_default_CodeMetrics ={
+                    "codemetrics_numOfLayers": 2,
+                    "codemetrics_numOfOutput": 64,
                 }
-            elif(config.checkCodeMetricsExists() & config.checkProcessMetricsExists()):
-                hp_default = {
-                    "metrics_numOfLayers": 2,
-                    "metrics_numOfOutput": 64,
-                    "sizeBatch": 128,
-                    "optimizer": "adam",
-                    "lrAdam": 1e-05,
-                    "beta1Adam": 0.9,
-                    "beta2Adam": 0.999,
-                    "epsilonAdam": 1e-08
+                hp_default = dict(**hp_default, **hp_default_CodeMetrics)
+            if(config.checkProcessMetricsExists()):
+                hp_default_processmetrics = {
+                    "processmetrics_numOfLayers": 2,
+                    "processmetrics_numOfOutput": 64,
                 }
-            elif(config.checkCommitSeqExists()):
-                hp_default = {
-                    "commitseq_numOfLayers": 2,
-                    "commitseq_hiddenSize": 128,
-                    "commitseq_rateDropout": 0.0,
-                    "sizeBatch": 128,
-                    "optimizer": "adam",
-                    "lrAdam": 1e-05,
-                    "beta1Adam": 0.9,
-                    "beta2Adam": 0.999,
-                    "epsilonAdam": 1e-08
-                }
-            elif(config.checkProcessMetricsExists()):
-                hp_default = {
-                    "metrics_numOfLayers": 2,
-                    "metrics_numOfOutput": 64,
-                    "sizeBatch": 128,
-                    "optimizer": "adam",
-                    "lrAdam": 1e-05,
-                    "beta1Adam": 0.9,
-                    "beta2Adam": 0.999,
-                    "epsilonAdam": 1e-08
-                }
+                hp_default = dict(**hp_default, **hp_default_processmetrics)
             study.enqueue_trial(hp_default)
         study.optimize(objectiveFunction, timeout=config.period4HyperParameterSearch)
         #save the hyperparameter that seems to be the best.
-        self.plotGraphHyperParameterSearch(study.get_trials())
-        config.pathHyperParameters = os.path.join(config.pathDirOutput, "hyperParameter.json")
-        with open(config.pathHyperParameters, mode='w') as file:
-            json.dump(dict(study.best_params.items()^study.best_trial.user_attrs.items()), file, indent=4)
+        self.plotGraphHyperParameterSearch([v.value for v in study.trials])
     def buildModel(self, datasets_Train_Test):
-        logger.info("search parameter")
-        with open(config.pathHyperParameters, mode='r') as file:
-            hp = json.load(file)
+        logger.info("build Model")
+
+        hp = self.loadHyperparameter()
 
         # prepare dataset
         dataset4Train = datasets_Train_Test["train"]
@@ -421,13 +433,20 @@ class Modeler(nn.Module):
         optimizer = self.defineOptimizer(hp, model)
 
         # prepare model parameters
-        _, lossesTrain, lossesValid, accsTrain, accsValid = self.searchParameter(dataloader, model, lossFunction, optimizer, hp["numEpochs"], isEarlyStopping=False)
+        _, lossesTrain, lossesValid, accsTrain, accsValid = self.searchParameter(
+            dataLoader = dataloader,
+            model = model,
+            lossFunction = lossFunction,
+            optimizer = optimizer,
+            numEpochs = hp["numEpochs"],
+            isEarlyStopping=False
+        )
         self.plotGraphTraining(lossesTrain, lossesValid, accsTrain, accsValid, "graphTrainToTest")
 
         config.pathParameters = os.path.join(config.pathDirOutput, "parameters")
         torch.save(model.state_dict(), config.pathParameters)
     def testModel(self, datasetTest):
-        logger.info("test parameter")
+        logger.info("test model")
 
         # get hyperparameter
         hp = self.loadHyperparameter()

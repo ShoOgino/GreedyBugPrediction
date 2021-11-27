@@ -23,13 +23,14 @@ class Dataset(torch.utils.data.Dataset):
             self.commitseqs.append(sample["x"]["commitseq"])
             self.processmetricss.append(sample["x"]["processmetrics"])
             self.ys.append(sample["y"])
-
     def __len__(self):
         return len(self.ids)
-
     def __getitem__(self, index):
         return self.ids[index], self.asts[index], self.astseqs[index], self.codemetricss[index], self.commitgraphs[index], self.commitseqs[index], self.processmetricss[index], self.ys[index]
-
+    def getNumOfNegatives(self):
+        return len([item for item in self.ys if item==0])
+    def getNumOfPositives(self):
+        return len([item for item in self.ys if item==1])
     def collate_fn(self, batch):
         ids, asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss, ys = list(zip(*batch))
 
