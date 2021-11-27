@@ -78,28 +78,28 @@ class Modeler(nn.Module):
             numOfFeatures += numOfFeatures_commitseq
         if(config.checkCodeMetricsExists()):
             numOfFeaturesMetrics = len(dataset.codemetricss[0])
-            for i in range(hp["metrics_numOfLayers"]):
+            for i in range(hp["codemetrics_numOfLayers"]):
                 if( i == 0 ):
                     in_features = numOfFeaturesMetrics
                 else:
-                    in_features = hp["metrics_numOfOutput"]
+                    in_features = hp["codemetrics_numOfOutput"]
                 self.componentsNetwork["codemetrics"]["linear"+str(i)] = nn.Linear(
                     in_features = in_features,
-                    out_features = hp["metrics_numOfOutput"]
+                    out_features = hp["codemetrics_numOfOutput"]
                 )
-            numOfFeatures += hp["metrics_numOfOutput"]
+            numOfFeatures += hp["codemetrics_numOfOutput"]
         if(config.checkProcessMetricsExists()):
             numOfFeaturesMetrics = len(dataset.processmetricss[0])
-            for i in range(hp["metrics_numOfLayers"]):
+            for i in range(hp["processmetrics_numOfLayers"]):
                 if( i == 0 ):
                     in_features = numOfFeaturesMetrics
                 else:
-                    in_features = hp["metrics_numOfOutput"]
+                    in_features = hp["processmetrics_numOfOutput"]
                 self.componentsNetwork["processmetrics"]["linear"+str(i)] = nn.Linear(
                     in_features = in_features,
-                    out_features = hp["metrics_numOfOutput"]
+                    out_features = hp["processmetrics_numOfOutput"]
                 )
-            numOfFeatures += hp["metrics_numOfOutput"]
+            numOfFeatures += hp["processmetrics_numOfOutput"]
         self.componentsNetwork["features"] = nn.Linear(numOfFeatures, 1)
         def forward(ast, astseq, codemetrics, commitgraph, commitseq, processmetrics):
             features = []
@@ -118,12 +118,14 @@ class Modeler(nn.Module):
                 featuresFromCommitSeq = parametersBiLSTM.squeeze()
                 features.append(featuresFromCommitSeq)
             if(config.checkCodeMetricsExists()):
+                featuresFromMetrics = codemetrics
                 for i in range(hp["metrics_numOfLayers"]):
-                    featuresFromMetrics = self.componentsNetwork["codemetrics"]["linear"+str(i)](codemetrics)
+                    featuresFromMetrics = self.componentsNetwork["codemetrics"]["linear"+str(i)](featuresFromMetrics)
                 features.append(featuresFromMetrics)
             if(config.checkProcessMetricsExists()):
-                for i in range(hp["metrics_numOfLayers"]):
-                    featuresFromMetrics = self.componentsNetwork["processmetrics"]["linear"+str(i)](processmetrics)
+                featuresFromMetrics = processmetrics
+                for i in range(hp["processmetrics_numOfLayers"]):
+                    featuresFromMetrics = self.componentsNetwork["processmetrics"]["linear"+str(i)](featuresFromMetrics)
                 features.append(featuresFromMetrics)
             features = torch.cat(features, dim = 1)
             y = self.componentsNetwork["features"](features)
@@ -149,11 +151,11 @@ class Modeler(nn.Module):
                 elif 'weight' in name:
                    nn.init.xavier_normal(param)
         if(config.checkCodeMetricsExists()):
-            for layer in nn.init.normal_(self.componentsNetwork["codemetrics"]):
-                nn.init.normal_(layer.weight, 0.0, 1.0)
+            for layer in self.componentsNetwork["codemetrics"]:
+                nn.init.normal_(self.componentsNetwork["codemetrics"][layer].weight, 0.0, 1.0)
         if(config.checkProcessMetricsExists()):
-            for layer in nn.init.normal_(self.componentsNetwork["processmetrics"]):
-                nn.init.normal_(layer.weight, 0.0, 1.0)
+            for layer in self.componentsNetwork["processmetrics"]:
+                nn.init.normal_(self.componentsNetwork["processmetrics"][layer].weight, 0.0, 1.0)
         nn.init.normal_(self.componentsNetwork["features"].weight, 0.0, 1.0)
     def defineOptimizer(self, hp, model):
         nameOptimizer = hp["optimizer"]
@@ -291,11 +293,11 @@ class Modeler(nn.Module):
                 hp["commitseq_hiddenSize"] = trial.suggest_int('commitseq_hiddenSize', 16, 256)
                 hp["commitseq_rateDropout"] = trial.suggest_uniform('commitseq_rateDropout', 0.0, 0.0)#trial.suggest_uniform('rateDropout', 0.0, 0.3)
             if(config.checkCodeMetricsExists()):
-                hp["codemetrics_numOfLayers"] = trial.suggest_int('metrics_numOfLayers', 1, 3)
-                hp["codemetrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 16, 128)
+                hp["codemetrics_numOfLayers"] = trial.suggest_int('codemetrics_numOfLayers', 1, 3)
+                hp["codemetrics_numOfOutput"] = trial.suggest_int('codemetrics_numOfOutput', 16, 128)
             if(config.checkProcessMetricsExists()):
-                hp["processmetrics_numOfLayers"] = trial.suggest_int('metrics_numOfLayers', 1, 3)
-                hp["processmetrics_numOfOutput"] = trial.suggest_int('metrics_numOfOutput', 16, 128)
+                hp["processmetrics_numOfLayers"] = trial.suggest_int('processmetrics_numOfLayers', 1, 3)
+                hp["processmetrics_numOfOutput"] = trial.suggest_int('processmetrics_numOfOutput', 16, 128)
             # prepare model architecture
             model = self.defineNetwork(hp, datasets_Train_Valid[0]["train"])
             # prepare loss function
