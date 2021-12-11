@@ -16,10 +16,10 @@ if __name__ == '__main__':
         config.TypeInput.processmetrics
     ]
     config.pathsDirSampleTrain         = [
-        "C:/Users/login/data/workspace/MLTool/datasets/{}/outputFile/R{}_r_train".format(config.project, config.release)
+        "C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_train".format(config.project, config.release)
     ]
     config.pathsDirSampleTest          = [
-        "C:/Users/login/data/workspace/MLTool/datasets/{}/outputFile/R{}_r_test".format(config.project, config.release)
+        "C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_test".format(config.project, config.release)
     ]
     config.isCrossValidation           = True
     config.splitSize4CrossValidation   = 5

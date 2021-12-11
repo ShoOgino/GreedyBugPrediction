@@ -208,13 +208,6 @@ class DataManeger(torch.utils.data.Dataset):
                     )
             listSamples.append(sample)
         metricsCommit = {
-            "stmtAdded": [],
-            "stmtDeleted": [],
-            "churn": [],
-            "decl": [],
-            "cond": [],
-            "elseAdded": [],
-            "elseDeleted": []
         }
         metricsCode = {
             "fanIn" : [],
@@ -228,20 +221,34 @@ class DataManeger(torch.utils.data.Dataset):
             "maxNesting" : [],
         }
         metricsProcess = {
-            "moduleHistories" : [],
-            "sumStmtAdded" : [],
-            "maxStmtAdded" : [],
-            "avgStmtAdded" : [],
-            "sumStmtDeleted" : [],
-            "maxStmtDeleted" : [],
-            "avgStmtDeleted" : [],
-            "sumChurn" : [],
-            "maxChurn" : [],
-            "avgChurn" : [],
-            "sumDecl" : [],
-            "sumCond" : [],
-            "sumElseAdded" : [],
-            "sumElseDeleted" : [],
+            "numOfCommits": [],
+            "numOfCommittersUnique": [],
+            "sumOfAdditionsLine": [],
+            "sumOfDeletionsLine": [],
+            "maxOfRatio_numOfChangesLineOfACommitter": [],
+            "complexityHistory": [],
+            "numOfCommittersUniqueNeighbor": [],
+            "numOfCommitsNeighbor": [],
+            "complexityHistoryNeighbor": [],
+            "maxOfRatio_numOfChangesLineOfACommitter": [],
+            "geometricmean_sumOfChangesLineByTheCommitter": [],
+            "numOfCommitsRefactoring": [],
+            "numOfCommitsFixingBugs": [],
+            "maxOfAdditionsLine": [],
+            "avgOfAdditionsLine": [],
+            "maxOfDeletionsLine": [],
+            "avgOfDeletionsLine": [],
+            "sumOfChurnLine": [],
+            "maxOfChurnLine": [],
+            "avgOfChurnLine": [],
+            "maxOfModulesCommittedSimultaneously": [],
+            "avgOfModulesCommittedSimultaneously": [],
+            "periodExisting": [],
+            "periodExistingWeighted": [],
+            "sumOfChangesDeclarationItself": [],
+            "sumOfChangesStatement": [],
+            "sumOfChangesCondition": [],
+            "sumOfChangesStatementElse": []
         }
         map2StandardizeMetricsCommit = {
             "stmtAdded": [],

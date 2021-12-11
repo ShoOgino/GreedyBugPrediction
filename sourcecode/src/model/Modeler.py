@@ -197,8 +197,9 @@ class Modeler(nn.Module):
                         processmetricss = processmetricss.to(self.device)
                     ys = ys.to(self.device)
                     ysPredicted = model(asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss)
-                    ysPredicted = ysPredicted.squeeze()
+                    ysPredicted = ysPredicted.squeeze()#もしysが1つしかなかったら、ベクトルじゃなくてスカラーに鳴ってしまう
                     ys = ys.squeeze()
+                    
                     loss=lossFunction(ysPredicted, ys)
 
                     if phase=="train":
