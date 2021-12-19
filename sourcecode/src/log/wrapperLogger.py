@@ -1,11 +1,11 @@
-from logging import getLogger, FileHandler, DEBUG, Formatter
+from logging import getLogger, FileHandler, DEBUG, Formatter, log
 from src.config.config import config
 import logging
 import os
 class wrapperLogger:
     def setup_logger(name, logfile):
-        os.makedirs(os.path.dirname(config.pathLog), exist_ok=True)
-        open(config.pathLog, 'a').close()
+        os.makedirs(os.path.dirname(logfile), exist_ok=True)
+        open(logfile, 'a').close()
         logger = logging.getLogger(name)
         logger.setLevel(logging.DEBUG)
 

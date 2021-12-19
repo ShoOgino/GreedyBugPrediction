@@ -2,7 +2,7 @@ from src.data.DataManeger import DataManeger
 from src.model.Modeler import Modeler
 from src.config.config import config
 from src.log.wrapperLogger import wrapperLogger
-logger = wrapperLogger.setup_logger(__name__, config.pathLog)
+logger = wrapperLogger.setup_logger(__name__, config.getPathFileLog())
 
 import os
 import shutil

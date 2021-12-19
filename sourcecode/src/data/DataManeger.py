@@ -1,7 +1,7 @@
 from src.config.config import config
 from src.data.Dataset import Dataset
 from src.log.wrapperLogger import wrapperLogger
-logger = wrapperLogger.setup_logger(__name__, config.pathLog)
+logger = wrapperLogger.setup_logger(__name__, config.getPathFileLog())
 
 import glob
 import json
@@ -70,7 +70,7 @@ class DataManeger(torch.utils.data.Dataset):
             with open(pathSample, encoding="utf-8") as fSample4Train:
                 sampleJson = json.load(fSample4Train)
                 sample["id"] = sampleJson["path"]
-                sample["y"] = sampleJson["isBuggy"]
+                sample["y"] = sampleJson["commitsOnModuleAll"]["isBuggy"]
                 sample["x"] = {
                     "ast": {
                         "nodes": [],
@@ -124,9 +124,9 @@ class DataManeger(torch.utils.data.Dataset):
                         ]
                     )
                 if(config.checkCommitGraphExists()):
-                    numOfCommits = len(sampleJson["commitGraph"])
-                    sample["x"]["commitgraph"]["nodes"] = [[None] for i in range(numOfCommits)]
-                    for i in range(numOfCommits):
+                    numOfCommitsOnModule = len(sampleJson["commitGraph"])
+                    sample["x"]["commitgraph"]["nodes"] = [[None] for i in range(numOfCommitsOnModule)]
+                    for i in range(numOfCommitsOnModule):
                         node = sampleJson["commitGraph"][i]
                         vector = [
                             [],
@@ -167,47 +167,38 @@ class DataManeger(torch.utils.data.Dataset):
                         for numParent in node["parents"]:
                             sample["x"]["commitgraph"]["edges"].append([node["num"], numParent])
                 if(config.checkCommitSeqExists()):
-                    commits = []
-                    for commit in sampleJson["commitGraph"]["modifications"].values():
-                        if(not commit["isMerge"]):
-                            commits.append(commit)
-                    commits = sorted(commits, key=lambda x: x['date'])
-                    numOfCommits = len(commits)
-                    sample["x"]["commitseq"] = [None] * numOfCommits
-                    if(0<numOfCommits):
-                        for i in range(numOfCommits):
-                            sample["x"]["commitseq"][i] = [
-                                (float(commits[i]["stmtAdded"])-map2StandardizeMetricsCommit["stmtAdded"][0])/map2StandardizeMetricsCommit["stmtAdded"][1],
-                                (float(commits[i]["stmtDeleted"])-map2StandardizeMetricsCommit["stmtDeleted"][0])/map2StandardizeMetricsCommit["stmtDeleted"][1],
-                                (float(commits[i]["churn"])-map2StandardizeMetricsCommit["churn"][0])/map2StandardizeMetricsCommit["churn"][1],
-                                (float(commits[i]["decl"])-map2StandardizeMetricsCommit["decl"][0])/map2StandardizeMetricsCommit["decl"][1],
-                                (float(commits[i]["cond"])-map2StandardizeMetricsCommit["cond"][0])/map2StandardizeMetricsCommit["cond"][1],
-                                (float(commits[i]["elseAdded"])-map2StandardizeMetricsCommit["elseAdded"][0])/map2StandardizeMetricsCommit["elseAdded"][1],
-                                (float(commits[i]["elseDeleted"])-map2StandardizeMetricsCommit["elseDeleted"][0])/map2StandardizeMetricsCommit["elseDeleted"][1]
-                            ]
+                    commitsOnModule = []
+                    for commitOnModule in sampleJson["commitsOnModuleInInterval"]["commitsOnModule"].values():
+                        commitsOnModule.append(commitOnModule)
+                    commitsOnModule = sorted(commitsOnModule, key=lambda x: x['date'])
+                    sample["x"]["commitseq"] = []
+                    if(0<len(commitsOnModule)):
+                        for commitOnModule in commitsOnModule:
+                            commitVector = []
+                            for nameVector in map2StandardizeMetricsCommit:
+                                for indexVector in range(len(map2StandardizeMetricsCommit[nameVector])):
+                                    if(map2StandardizeMetricsCommit[nameVector][indexVector][1]!=0):
+                                        commitVector.append((commitOnModule[nameVector][indexVector]-map2StandardizeMetricsCommit[nameVector][indexVector][0])/map2StandardizeMetricsCommit[nameVector][indexVector][1])
+                                    else:
+                                        commitVector.append(0)
+                            sample["x"]["commitseq"].append(commitVector)
                     else:
-                        sample["x"]["commitseq"] = [[0, 0, 0, 0, 0, 0, 0]]
+                        length = 0
+                        for nameVector in map2StandardizeMetricsCommit:
+                            length += len(map2StandardizeMetricsCommit[nameVector])
+                        commitVector=[0 for x in range(length)]
+                        sample["x"]["commitseq"].append(commitVector)
                 if(config.checkProcessMetricsExists()):
-                    sample["x"]["processmetrics"].extend(
-                        [
-                            (float(sampleJson["commitGraph"]["moduleHistories"])-map2StandardizeMetricsProcess["moduleHistories"][0]) / map2StandardizeMetricsProcess["moduleHistories"][1],
-                            (float(sampleJson["commitGraph"]["sumStmtAdded"])-map2StandardizeMetricsProcess["sumStmtAdded"][0]) / map2StandardizeMetricsProcess["sumStmtAdded"][1],
-                            (float(sampleJson["commitGraph"]["maxStmtAdded"])-map2StandardizeMetricsProcess["maxStmtAdded"][0]) / map2StandardizeMetricsProcess["maxStmtAdded"][1],
-                            (float(sampleJson["commitGraph"]["avgStmtAdded"])-map2StandardizeMetricsProcess["avgStmtAdded"][0]) / map2StandardizeMetricsProcess["avgStmtAdded"][1],
-                            (float(sampleJson["commitGraph"]["sumStmtDeleted"])-map2StandardizeMetricsProcess["sumStmtDeleted"][0]) / map2StandardizeMetricsProcess["sumStmtDeleted"][1],
-                            (float(sampleJson["commitGraph"]["maxStmtDeleted"])-map2StandardizeMetricsProcess["maxStmtDeleted"][0]) / map2StandardizeMetricsProcess["maxStmtDeleted"][1],
-                            (float(sampleJson["commitGraph"]["avgStmtDeleted"])-map2StandardizeMetricsProcess["avgStmtDeleted"][0]) / map2StandardizeMetricsProcess["avgStmtDeleted"][1],
-                            (float(sampleJson["commitGraph"]["sumChurn"])-map2StandardizeMetricsProcess["sumChurn"][0]) / map2StandardizeMetricsProcess["sumChurn"][1],
-                            (float(sampleJson["commitGraph"]["maxChurn"])-map2StandardizeMetricsProcess["maxChurn"][0]) / map2StandardizeMetricsProcess["maxChurn"][1],
-                            (float(sampleJson["commitGraph"]["avgChurn"])-map2StandardizeMetricsProcess["avgChurn"][0]) / map2StandardizeMetricsProcess["avgChurn"][1],
-                            (float(sampleJson["commitGraph"]["sumDecl"])-map2StandardizeMetricsProcess["sumDecl"][0]) / map2StandardizeMetricsProcess["sumDecl"][1],
-                            (float(sampleJson["commitGraph"]["sumCond"])-map2StandardizeMetricsProcess["sumCond"][0]) / map2StandardizeMetricsProcess["sumCond"][1],
-                            (float(sampleJson["commitGraph"]["sumElseAdded"])-map2StandardizeMetricsProcess["sumElseAdded"][0]) / map2StandardizeMetricsProcess["sumElseAdded"][1],
-                            (float(sampleJson["commitGraph"]["sumElseDeleted"])-map2StandardizeMetricsProcess["sumElseDeleted"][0]) / map2StandardizeMetricsProcess["sumElseDeleted"][1]
-                        ]
-                    )
+                    for item in map2StandardizeMetricsProcess:
+                        sample["x"]["processmetrics"].append((float(sampleJson["commitsOnModuleInInterval"][item])-map2StandardizeMetricsProcess[item][0]) / map2StandardizeMetricsProcess[item][1])
             listSamples.append(sample)
         metricsCommit = {
+            "vectorSemanticType": [],
+            "vectorAuthor": [],
+            "vectorInterval": [],
+            "vectorType": [],
+            "vectorCodeChurn": [],
+            "vectorCochange": []
         }
         metricsCode = {
             "fanIn" : [],
@@ -226,12 +217,14 @@ class DataManeger(torch.utils.data.Dataset):
             "sumOfAdditionsLine": [],
             "sumOfDeletionsLine": [],
             "maxOfRatio_numOfChangesLineOfACommitter": [],
+            "numOfCommittersUnfamiliar": [],
             "complexityHistory": [],
-            "numOfCommittersUniqueNeighbor": [],
             "numOfCommitsNeighbor": [],
+            "numOfCommittersUniqueNeighbor": [],
             "complexityHistoryNeighbor": [],
             "maxOfRatio_numOfChangesLineOfACommitter": [],
             "geometricmean_sumOfChangesLineByTheCommitter": [],
+
             "numOfCommitsRefactoring": [],
             "numOfCommitsFixingBugs": [],
             "maxOfAdditionsLine": [],
@@ -245,19 +238,19 @@ class DataManeger(torch.utils.data.Dataset):
             "avgOfModulesCommittedSimultaneously": [],
             "periodExisting": [],
             "periodExistingWeighted": [],
+
             "sumOfChangesDeclarationItself": [],
             "sumOfChangesStatement": [],
             "sumOfChangesCondition": [],
             "sumOfChangesStatementElse": []
         }
         map2StandardizeMetricsCommit = {
-            "stmtAdded": [],
-            "stmtDeleted": [],
-            "churn": [],
-            "decl": [],
-            "cond": [],
-            "elseAdded": [],
-            "elseDeleted": []
+            "vectorSemanticType": [],
+            "vectorAuthor": [],
+            "vectorInterval": [],
+            "vectorType": [],
+            "vectorCodeChurn": [],
+            "vectorCochange": []
         }
         map2StandardizeMetricsCode = {
             "fanIn" : [],
@@ -271,30 +264,66 @@ class DataManeger(torch.utils.data.Dataset):
             "maxNesting" : [],
         }
         map2StandardizeMetricsProcess = {
-            "moduleHistories" : [],
-            "sumStmtAdded" : [],
-            "maxStmtAdded" : [],
-            "avgStmtAdded" : [],
-            "sumStmtDeleted" : [],
-            "maxStmtDeleted" : [],
-            "avgStmtDeleted" : [],
-            "sumChurn" : [],
-            "maxChurn" : [],
-            "avgChurn" : [],
-            "sumDecl" : [],
-            "sumCond" : [],
-            "sumElseAdded" : [],
-            "sumElseDeleted" : [],
+            "numOfCommits": [],
+            "numOfCommittersUnique": [],
+            "sumOfAdditionsLine": [],
+            "sumOfDeletionsLine": [],
+            "maxOfRatio_numOfChangesLineOfACommitter": [],
+            "numOfCommittersUnfamiliar": [],
+            "complexityHistory": [],
+            "numOfCommitsNeighbor": [],
+            "numOfCommittersUniqueNeighbor": [],
+            "complexityHistoryNeighbor": [],
+            "maxOfRatio_numOfChangesLineOfACommitter": [],
+            "geometricmean_sumOfChangesLineByTheCommitter": [],
+
+            "numOfCommitsRefactoring": [],
+            "numOfCommitsFixingBugs": [],
+            "maxOfAdditionsLine": [],
+            "avgOfAdditionsLine": [],
+            "maxOfDeletionsLine": [],
+            "avgOfDeletionsLine": [],
+            "sumOfChurnLine": [],
+            "maxOfChurnLine": [],
+            "avgOfChurnLine": [],
+            "maxOfModulesCommittedSimultaneously": [],
+            "avgOfModulesCommittedSimultaneously": [],
+            "periodExisting": [],
+            "periodExistingWeighted": [],
+
+            "sumOfChangesDeclarationItself": [],
+            "sumOfChangesStatement": [],
+            "sumOfChangesCondition": [],
+            "sumOfChangesStatementElse": []
         }
         if(config.checkCommitSeqExists()):
+            # vectorのサイズを決定
+            with open(self.pathsSample4Train[0], encoding="utf-8") as fSample4Train:
+                sampleJson = json.load(fSample4Train)
+                for commitOnModule in sampleJson["commitsOnModuleInInterval"]["commitsOnModule"].values():
+                    metricsCommit["vectorSemanticType"] = [[] for x in range(len(commitOnModule["vectorSemanticType"]))]
+                    metricsCommit["vectorAuthor"] = [[] for x in range(len(commitOnModule["vectorAuthor"]))]
+                    metricsCommit["vectorInterval"] = [[] for x in range(len(commitOnModule["vectorInterval"]))]
+                    metricsCommit["vectorType"] = [[] for x in range(len(commitOnModule["vectorType"]))]
+                    metricsCommit["vectorCodeChurn"] = [[] for x in range(len(commitOnModule["vectorCodeChurn"]))]
+                    metricsCommit["vectorCochange"] = [[] for x in range(len(commitOnModule["vectorCochange"]))]
+                    map2StandardizeMetricsCommit["vectorSemanticType"] = [[] for x in range(len(commitOnModule["vectorSemanticType"]))]
+                    map2StandardizeMetricsCommit["vectorAuthor"] = [[] for x in range(len(commitOnModule["vectorAuthor"]))]
+                    map2StandardizeMetricsCommit["vectorInterval"] = [[] for x in range(len(commitOnModule["vectorInterval"]))]
+                    map2StandardizeMetricsCommit["vectorType"] = [[] for x in range(len(commitOnModule["vectorType"]))]
+                    map2StandardizeMetricsCommit["vectorCodeChurn"] = [[] for x in range(len(commitOnModule["vectorCodeChurn"]))]
+                    map2StandardizeMetricsCommit["vectorCochange"] = [[] for x in range(len(commitOnModule["vectorCochange"]))]
+                    break
             for pathSample4Train in self.pathsSample4Train:
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
                     sampleJson = json.load(fSample4Train)
-                    for commit in sampleJson["commitGraph"]["modifications"].values():
+                    for commitOnModule in sampleJson["commitsOnModuleInInterval"]["commitsOnModule"].values():
                         for item in metricsCommit:
-                            metricsCommit[item].append(commit[item])
+                            for i in range(len(metricsCommit[item])):
+                                metricsCommit[item][i].append(commitOnModule[item][i])
             for item in map2StandardizeMetricsCommit:
-                map2StandardizeMetricsCommit[item] = [np.array(metricsCommit[item]).mean(), np.std(metricsCommit[item])]
+                for i in range(len(metricsCommit[item])):
+                    map2StandardizeMetricsCommit[item][i] = [np.array(metricsCommit[item][i]).mean(), np.std(metricsCommit[item][i])]
         if(config.checkCodeMetricsExists()):
             for pathSample4Train in self.pathsSample4Train:
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
@@ -308,7 +337,7 @@ class DataManeger(torch.utils.data.Dataset):
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
                     sampleJson = json.load(fSample4Train)
                     for item in metricsProcess:
-                        metricsProcess[item].append(sampleJson["commitGraph"][item])
+                        metricsProcess[item].append(float(sampleJson["commitsOnModuleInInterval"][item]))
             for item in map2StandardizeMetricsProcess:
                 map2StandardizeMetricsProcess[item] = [np.array(metricsProcess[item]).mean(), np.std(metricsProcess[item])]
         for pathSample4Train in self.pathsSample4Train:

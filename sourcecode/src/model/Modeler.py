@@ -1,7 +1,8 @@
 from src.config.config import config
 from src.data.Dataset import Dataset
 from src.log.wrapperLogger import wrapperLogger
-logger = wrapperLogger.setup_logger(__name__, config.pathLog)
+logger = wrapperLogger.setup_logger(__name__, config.getPathFileLog())
+import sys
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -171,7 +172,7 @@ class Modeler(nn.Module):
         lossesValid = []
         accsTrain = []
         accsValid = []
-        lossValidBest = 10000
+        lossValidBest = sys.float_info.max
         epochBestValid = 0
         for epoch in range(numEpochs):
             for phase in ["train","valid"]:
@@ -182,38 +183,44 @@ class Modeler(nn.Module):
                 loss_sum=0
                 corrects=0
                 total=0
-                for asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss, ys in dataLoader[phase]:
-                    if(config.checkASTExists()):
-                        asts = asts.to(self.device)
-                    if(config.checkASTSeqExists()):
-                        astseqs = astseqs.to(self.device)
-                    if(config.checkCommitGraphExists()):
-                        commitgraphs = commitgraphs.to(self.device)
-                    if(config.checkCommitSeqExists()):
-                        commitseqs = commitseqs.to(self.device)
-                    if(config.checkCodeMetricsExists()):
-                        codemetricss = codemetricss.to(self.device)
-                    if(config.checkProcessMetricsExists()):
-                        processmetricss = processmetricss.to(self.device)
-                    ys = ys.to(self.device)
-                    ysPredicted = model(asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss)
-                    ysPredicted = ysPredicted.squeeze()#もしysが1つしかなかったら、ベクトルじゃなくてスカラーに鳴ってしまう
-                    ys = ys.squeeze()
-                    
-                    loss=lossFunction(ysPredicted, ys)
+                with tqdm(total=len(dataLoader[phase]),unit="batch") as pbar:
+                    pbar.set_description(f"Epoch[{epoch}/{numEpochs}]({phase})")
+                    for asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss, ys in  dataLoader[phase]:
+                        if(config.checkASTExists()):
+                            asts = asts.to(self.device)
+                        if(config.checkASTSeqExists()):
+                            astseqs = astseqs.to(self.device)
+                        if(config.checkCommitGraphExists()):
+                            commitgraphs = commitgraphs.to(self.device)
+                        if(config.checkCommitSeqExists()):
+                            commitseqs = commitseqs.to(self.device)
+                        if(config.checkCodeMetricsExists()):
+                            codemetricss = codemetricss.to(self.device)
+                        if(config.checkProcessMetricsExists()):
+                            processmetricss = processmetricss.to(self.device)
+                        ys = ys.to(self.device)
+                        ysPredicted = model(asts, astseqs, codemetricss, commitgraphs, commitseqs, processmetricss)
+                        ysPredicted = ysPredicted.squeeze()#もしysが1つしかなかったら、ベクトルじゃなくてスカラーに鳴ってしまう
+                        ys = ys.squeeze()
+                        
+                        loss=lossFunction(ysPredicted, ys)
 
-                    if phase=="train":
-                        optimizer.zero_grad()
-                        loss.backward()
-                        optimizer.step()
+                        if phase=="train":
+                            optimizer.zero_grad()
+                            loss.backward()
+                            optimizer.step()
 
-                    sig = nn.Sigmoid()
-                    ysPredicted =  torch.round(sig(ysPredicted))
-                    corrects+=int((ysPredicted==ys).sum())
-                    total+=ys.size(0)
-                    #loss関数で通してでてきたlossはCrossEntropyLossのreduction="mean"なので平均
-                    #batch sizeをかけることで、batch全体での合計を今までのloss_sumに足し合わせる
-                    loss_sum += float(loss) * ys.size(0)
+                        sig = nn.Sigmoid()
+                        ysPredicted =  torch.round(sig(ysPredicted))
+                        corrects+=int((ysPredicted==ys).sum())
+                        total+=ys.size(0)
+                        accuracy = corrects/total
+                        #loss関数で通してでてきたlossはCrossEntropyLossのreduction="mean"なので平均
+                        #batch sizeをかけることで、batch全体での合計を今までのloss_sumに足し合わせる
+                        loss_sum += float(loss) * ys.size(0)
+                        running_loss = loss_sum/total
+                        pbar.set_postfix({"loss":running_loss,"accuracy":accuracy })
+                        pbar.update(1)
                 if(phase == "train"):
                     lossesTrain.append(loss_sum/total)
                     accsTrain.append(corrects/total)
@@ -221,6 +228,7 @@ class Modeler(nn.Module):
                     lossesValid.append(loss_sum/total)
                     accsValid.append(corrects/total)
                     if(loss_sum < lossValidBest):
+                        print("loss gets lower")
                         lossValidBest = loss_sum
                         epochBestValid = epoch
             if(isEarlyStopping and self.epochsEarlyStopping<epoch-epochBestValid):

@@ -4,23 +4,32 @@ from multiprocessing import Process
 import multiprocessing
 
 class config:
+    # general
     id = None
-    pathConfigFile = None
     purpose = None
+    pathDirOutput = None
+    # load dataset
     typesInput = None
-    pathsDirSampleTrain = None # list
-    pathsDirSampleTest = None # list
+    pathsDirSampleTrain = None
+    pathsDirSampleTest = None
+    # build model 
+    device = None
+    epochs4EarlyStopping = None
+    # tune hyperparameter
     isCrossValidation = None
     splitSize4CrossValidation = None
-    epochs4EarlyStopping = None
     trials4HyperParameterSearch = None
     period4HyperParameterSearch = None
-    device = None
-    pathLog = None
+    # load hyperparameter
     pathDatabaseOptuna = None
     hyperparameter = None
+    # use model
     pathModel = None
-    pathDirOutput = None
+
+    def getDirOutput():
+        return config.pathDirOutput
+    def getPathFileLog():
+        return config.pathDirOutput+"/log.txt"
 
     class Purpose(Enum):
         searchHyperParameter = 1
