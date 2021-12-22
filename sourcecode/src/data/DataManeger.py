@@ -378,8 +378,8 @@ class DataManeger(torch.utils.data.Dataset):
             dataset4Train.extend(trainBuggy)
             dataset4Train.extend(trainNotBuggy)
             random.shuffle(dataset4Train)#最初に1, 次に0ばっかり並んでしまっている。
-            dataset_train_valid["train"] = Dataset(dataset4Train)
-            dataset_train_valid["valid"] = Dataset(dataset4Valid)
+            dataset_train_valid["train"] = dataset4Train
+            dataset_train_valid["valid"] = dataset4Valid
             self.datasets_Train_Valid.append(dataset_train_valid)
             if(not isCrossValidation):
                 break
@@ -400,8 +400,8 @@ class DataManeger(torch.utils.data.Dataset):
         dataset4Train.extend(samplesNotBuggy)
         random.shuffle(dataset4Train)#最初に1, 次に0ばっかり並んでしまうのを防ぐ。
         dataset4Test = self.samples4Test
-        dataset_Train_Test["train"] = Dataset(dataset4Train)
-        dataset_Train_Test["test"] = Dataset(dataset4Test)
+        dataset_Train_Test["train"] = dataset4Train
+        dataset_Train_Test["test"] = dataset4Test
         self.datasets_Train_Test = dataset_Train_Test
     def getNumOfSamples4TrainPositive(self):
         return len([sample for sample in self.samples4Train if sample["y"]==1])

@@ -377,6 +377,9 @@ class Modeler(nn.Module):
             )
             return sumOfSquare
         logger.info("hyperparameter search started")
+        for dataset_Train_Valid in datasets_Train_Valid:
+            dataset_Train_Valid["train"] = Dataset(dataset_Train_Valid["train"])
+            dataset_Train_Valid["valid"] = Dataset(dataset_Train_Valid["valid"])
         config.pathDatabaseOptuna = config.pathDatabaseOptuna or config.pathDirOutput + "/optuna.db"
         study = optuna.create_study(study_name="optuna", storage='sqlite:///'+config.pathDatabaseOptuna, load_if_exists=True)
         if(len(study.get_trials())==0):
@@ -424,8 +427,8 @@ class Modeler(nn.Module):
         hp = self.loadHyperparameter()
 
         # prepare dataset
-        dataset4Train = datasets_Train_Test["train"]
-        dataset4Test = datasets_Train_Test["test"]
+        dataset4Train = Dataset(datasets_Train_Test["train"])
+        dataset4Test = Dataset(datasets_Train_Test["test"])
         dataloader={
             "train": DataLoader(
                 dataset4Train,
@@ -470,7 +473,7 @@ class Modeler(nn.Module):
         hp = self.loadHyperparameter()
 
         # get dataset
-        dataset4Test = datasetTest
+        dataset4Test = Dataset(datasetTest)
         dataloader={
             "test": DataLoader(
                 dataset4Test,

@@ -14,6 +14,7 @@ class config:
     pathsDirSampleTest = None
     # build model 
     device = None
+    algorithm = None
     epochs4EarlyStopping = None
     # tune hyperparameter
     isCrossValidation = None
