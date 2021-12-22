@@ -110,19 +110,8 @@ class DataManeger(torch.utils.data.Dataset):
                     nodes = flattenTree(sampleJson["ast"])
                     sample["x"]["astseq"] = onehotnizeAST(nodes)
                 if(config.checkCodeMetricsExists()):
-                    sample["x"]["codemetrics"].extend(
-                        [
-                            (float(sampleJson["sourcecode"]["fanIn"])-map2StandardizeMetricsCode["fanIn"][0]) / map2StandardizeMetricsCode["fanIn"][1],
-                            (float(sampleJson["sourcecode"]["fanOut"])-map2StandardizeMetricsCode["fanOut"][0]) / map2StandardizeMetricsCode["fanOut"][1],
-                            (float(sampleJson["sourcecode"]["parameters"])-map2StandardizeMetricsCode["parameters"][0]) / map2StandardizeMetricsCode["parameters"][1],
-                            (float(sampleJson["sourcecode"]["localVar"])-map2StandardizeMetricsCode["localVar"][0]) / map2StandardizeMetricsCode["localVar"][1],
-                            (float(sampleJson["sourcecode"]["commentRatio"])-map2StandardizeMetricsCode["commentRatio"][0]) / map2StandardizeMetricsCode["commentRatio"][1],
-                            (float(sampleJson["sourcecode"]["countPath"])-map2StandardizeMetricsCode["countPath"][0]) / map2StandardizeMetricsCode["countPath"][1],
-                            (float(sampleJson["sourcecode"]["complexity"])-map2StandardizeMetricsCode["complexity"][0]) / map2StandardizeMetricsCode["complexity"][1],
-                            (float(sampleJson["sourcecode"]["execStmt"])-map2StandardizeMetricsCode["execStmt"][0]) / map2StandardizeMetricsCode["execStmt"][1],
-                            (float(sampleJson["sourcecode"]["maxNesting"])-map2StandardizeMetricsCode["maxNesting"][0]) / map2StandardizeMetricsCode["maxNesting"][1]
-                        ]
-                    )
+                    for item in map2StandardizeMetricsCode:
+                        sample["x"]["codemetrics"].append((float(sampleJson["sourcecode"][item])-map2StandardizeMetricsCode[item][0]) / map2StandardizeMetricsCode[item][1])
                 if(config.checkCommitGraphExists()):
                     numOfCommitsOnModule = len(sampleJson["commitGraph"])
                     sample["x"]["commitgraph"]["nodes"] = [[None] for i in range(numOfCommitsOnModule)]
@@ -201,48 +190,31 @@ class DataManeger(torch.utils.data.Dataset):
             "vectorCochange": []
         }
         metricsCode = {
-            "fanIn" : [],
-            "fanOut" : [],
-            "parameters" : [],
-            "localVar" : [],
-            "commentRatio" : [],
-            "countPath" : [],
+            "fanin" : [],
+            "fanout" : [],
+            "numOfParameters" : [],
+            "numOfVariablesLocal" : [],
+            "ratioOfLinesComment" : [],
+            "numOfPaths" : [],
             "complexity" : [],
-            "execStmt" : [],
-            "maxNesting" : [],
+            "numOfStatements" : [],
+            "maxOfNesting" : []
         }
         metricsProcess = {
-            "numOfCommits": [],
-            "numOfCommittersUnique": [],
-            "sumOfAdditionsLine": [],
-            "sumOfDeletionsLine": [],
-            "maxOfRatio_numOfChangesLineOfACommitter": [],
-            "numOfCommittersUnfamiliar": [],
-            "complexityHistory": [],
-            "numOfCommitsNeighbor": [],
-            "numOfCommittersUniqueNeighbor": [],
-            "complexityHistoryNeighbor": [],
-            "maxOfRatio_numOfChangesLineOfACommitter": [],
-            "geometricmean_sumOfChangesLineByTheCommitter": [],
-
-            "numOfCommitsRefactoring": [],
-            "numOfCommitsFixingBugs": [],
-            "maxOfAdditionsLine": [],
-            "avgOfAdditionsLine": [],
-            "maxOfDeletionsLine": [],
-            "avgOfDeletionsLine": [],
-            "sumOfChurnLine": [],
-            "maxOfChurnLine": [],
-            "avgOfChurnLine": [],
-            "maxOfModulesCommittedSimultaneously": [],
-            "avgOfModulesCommittedSimultaneously": [],
-            "periodExisting": [],
-            "periodExistingWeighted": [],
-
-            "sumOfChangesDeclarationItself": [],
-            "sumOfChangesStatement": [],
-            "sumOfChangesCondition": [],
-            "sumOfChangesStatementElse": []
+            "numOfCommits" : [],
+            "sumOfAdditionsStatement" : [],
+            "maxOfAdditionsStatement" : [],
+            "avgOfAdditionsStatement" : [],
+            "sumOfDeletionsStatement" : [],
+            "maxOfDeletionsStatement" : [],
+            "avgOfDeletionsStatement" : [],
+            "sumOfChurnsStatement" : [],
+            "maxOfChurnsStatement" : [],
+            "avgOfChurnsStatement" : [],
+            "sumOfChangesDeclarationItself" : [],
+            "sumOfChangesCondition" : [],
+            "sumOfAdditionStatementElse" : [],
+            "sumOfDeletionStatementElse" : [],
         }
         map2StandardizeMetricsCommit = {
             "vectorSemanticType": [],
@@ -253,48 +225,31 @@ class DataManeger(torch.utils.data.Dataset):
             "vectorCochange": []
         }
         map2StandardizeMetricsCode = {
-            "fanIn" : [],
-            "fanOut" : [],
-            "parameters" : [],
-            "localVar" : [],
-            "commentRatio" : [],
-            "countPath" : [],
+            "fanin" : [],
+            "fanout" : [],
+            "numOfParameters" : [],
+            "numOfVariablesLocal" : [],
+            "ratioOfLinesComment" : [],
+            "numOfPaths" : [],
             "complexity" : [],
-            "execStmt" : [],
-            "maxNesting" : [],
+            "numOfStatements" : [],
+            "maxOfNesting" : []
         }
         map2StandardizeMetricsProcess = {
-            "numOfCommits": [],
-            "numOfCommittersUnique": [],
-            "sumOfAdditionsLine": [],
-            "sumOfDeletionsLine": [],
-            "maxOfRatio_numOfChangesLineOfACommitter": [],
-            "numOfCommittersUnfamiliar": [],
-            "complexityHistory": [],
-            "numOfCommitsNeighbor": [],
-            "numOfCommittersUniqueNeighbor": [],
-            "complexityHistoryNeighbor": [],
-            "maxOfRatio_numOfChangesLineOfACommitter": [],
-            "geometricmean_sumOfChangesLineByTheCommitter": [],
-
-            "numOfCommitsRefactoring": [],
-            "numOfCommitsFixingBugs": [],
-            "maxOfAdditionsLine": [],
-            "avgOfAdditionsLine": [],
-            "maxOfDeletionsLine": [],
-            "avgOfDeletionsLine": [],
-            "sumOfChurnLine": [],
-            "maxOfChurnLine": [],
-            "avgOfChurnLine": [],
-            "maxOfModulesCommittedSimultaneously": [],
-            "avgOfModulesCommittedSimultaneously": [],
-            "periodExisting": [],
-            "periodExistingWeighted": [],
-
-            "sumOfChangesDeclarationItself": [],
-            "sumOfChangesStatement": [],
-            "sumOfChangesCondition": [],
-            "sumOfChangesStatementElse": []
+            "numOfCommits" : [],
+            "sumOfAdditionsStatement" : [],
+            "maxOfAdditionsStatement" : [],
+            "avgOfAdditionsStatement" : [],
+            "sumOfDeletionsStatement" : [],
+            "maxOfDeletionsStatement" : [],
+            "avgOfDeletionsStatement" : [],
+            "sumOfChurnsStatement" : [],
+            "maxOfChurnsStatement" : [],
+            "avgOfChurnsStatement" : [],
+            "sumOfChangesDeclarationItself" : [],
+            "sumOfChangesCondition" : [],
+            "sumOfAdditionStatementElse" : [],
+            "sumOfDeletionStatementElse" : [],
         }
         if(config.checkCommitSeqExists()):
             # vectorのサイズを決定
@@ -329,7 +284,7 @@ class DataManeger(torch.utils.data.Dataset):
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
                     sampleJson = json.load(fSample4Train)
                     for item in metricsCode:
-                        metricsCode[item].append(sampleJson[item])
+                        metricsCode[item].append(sampleJson["sourcecode"][item])
             for item in map2StandardizeMetricsCode:
                 map2StandardizeMetricsCode[item] = [np.array(metricsCode[item]).mean(), np.std(metricsCode[item])]
         if(config.checkProcessMetricsExists()):

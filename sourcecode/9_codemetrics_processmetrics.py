@@ -1,30 +1,35 @@
-from src.manager import Maneger
-from src.config.cfg import cfg
-
+from src.config.config import config
 import os
-import glob
-import shutil
-from multiprocessing import Pool
-from multiprocessing import Process
-import multiprocessing
 import datetime
 
-# cfg(タスクの設定)を更新
-cfg.clear()
-cfg.pathConfigFile              = os.path.abspath(__file__)
-cfg.project                     = "egit"
-cfg.release                     = 2
-cfg.purpose                     = [cfg.Purpose.searchHyperParameter, cfg.Purpose.searchParameter, cfg.Purpose.test]
-cfg.typesInput                  = [cfg.TypeInput.codemetrics, cfg.TypeInput.processmetrics]
-cfg.pathsSampleTrain            = ["C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_train".format(cfg.project, cfg.release)]
-cfg.pathsSampleTest             = ["C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_test".format(cfg.project, cfg.release)]
-cfg.adoptingCrossValidation     = False
-cfg.splitSize4Validation        = 5
-cfg.epochs4EarlyStopping        = 10
-cfg.period4HyperParameterSearch = 60*60*24
-cfg.id                          = os.path.splitext(os.path.basename(cfg.pathConfigFile))[0] + "_" + cfg.project + "_" + str(cfg.release)
-cfg.pathDirOutput               = os.path.dirname(os.path.dirname(cfg.pathConfigFile)) + "/results/" + cfg.id + "_"+str(datetime.datetime.today().strftime("%Y%m%d_%H%M%S"))
+if __name__ == '__main__':
+    # config(タスクの設定)を更新
+    config.pathConfigFile              = os.path.abspath(__file__)
+    config.project                     = "egit"
+    config.release                     = 2
+    config.purpose                     = [
+        config.Purpose.searchHyperParameter,
+        config.Purpose.buildModel,
+        config.Purpose.testModel
+    ]
+    config.typesInput                  = [
+        config.TypeInput.codemetrics, config.TypeInput.processmetrics
+    ]
+    config.pathsDirSampleTrain         = [
+        "C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_train".format(config.project, config.release)
+    ]
+    config.pathsDirSampleTest          = [
+        "C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_test".format(config.project, config.release)
+    ]
+    config.algorithm = "RF"
+    config.isCrossValidation           = False
+    config.splitSize4CrossValidation   = 5
+    config.epochs4EarlyStopping        = 10
+    config.period4HyperParameterSearch = 60*1
+    config.id                          = os.path.splitext(os.path.basename(config.pathConfigFile))[0] + "_" + config.project + "_" + str(config.release)
+    config.pathDirOutput               = os.path.dirname(os.path.dirname(config.pathConfigFile)) + "/results/" + config.id + "_"+str(datetime.datetime.today().strftime("%Y%m%d_%H%M%S"))
 
-# 実験を実行
-maneger = Maneger()
-maneger.run()
+    # 実験を実行
+    from src.manager import Maneger
+    maneger = Maneger()
+    maneger.run()

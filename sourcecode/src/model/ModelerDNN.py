@@ -21,7 +21,7 @@ from sklearn.metrics import mean_squared_error, classification_report
 from sklearn.metrics import confusion_matrix
 from sklearn.metrics import roc_auc_score
 
-class Modeler(nn.Module):
+class ModelerDNN(nn.Module):
     def __init__(self):
         super().__init__()
         self.trials4HyperParameterSearch = config.trials4HyperParameterSearch

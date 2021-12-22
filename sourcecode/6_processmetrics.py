@@ -21,7 +21,7 @@ if __name__ == '__main__':
     config.pathsDirSampleTest          = [
         "C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_test".format(config.project, config.release)
     ]
-    config.algorithm = "RF"
+    config.algorithm = "DNN"
     config.isCrossValidation           = True
     config.splitSize4CrossValidation   = 5
     config.epochs4EarlyStopping        = 100

@@ -1,5 +1,6 @@
 from src.data.DataManeger import DataManeger
-from src.model.Modeler import Modeler
+from src.model.ModelerDNN import ModelerDNN
+from src.model.ModelerRF import ModelerRF
 from src.config.config import config
 from src.log.wrapperLogger import wrapperLogger
 logger = wrapperLogger.setup_logger(__name__, config.getPathFileLog())
@@ -26,7 +27,12 @@ class Maneger:
         dataManeger.loadSamples()
 
         # モデル職人生成
-        modeler = Modeler()
+        if(config.algorithm=="DNN"):
+            modeler = ModelerDNN()
+        elif(config.algorithm=="RF"):
+            modeler = ModelerRF()
+        else:
+            raise Exception()
 
         # データ職人・モデル職人にタスクを移譲
         if(config.checkPurposeContainsSearchHyperParameter()):
