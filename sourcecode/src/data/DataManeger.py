@@ -113,48 +113,7 @@ class DataManeger(torch.utils.data.Dataset):
                     for item in map2StandardizeMetricsCode:
                         sample["x"]["codemetrics"].append((float(sampleJson["sourcecode"][item])-map2StandardizeMetricsCode[item][0]) / map2StandardizeMetricsCode[item][1])
                 if(config.checkCommitGraphExists()):
-                    numOfCommitsOnModule = len(sampleJson["commitGraph"])
-                    sample["x"]["commitgraph"]["nodes"] = [[None] for i in range(numOfCommitsOnModule)]
-                    for i in range(numOfCommitsOnModule):
-                        node = sampleJson["commitGraph"][i]
-                        vector = [
-                            [],
-                            [0] * len(committer2Num),
-                            [0] * 2,
-                            [0] * 50,
-                            [[0] * 50 for i in range(3)],
-                            [0] * len(module2Num)
-                        ]
-                        vector[0] = node["semantics"]
-                        if(node["author"] in committer2Num):
-                            vector[1][committer2Num[node["author"]]] = 1
-                        else:
-                            vector[1][0] = 1
-                        if(node["isMerge"]==True):
-                            vector[2][0] = 1
-                        else:
-                            vector[2][0] = 0
-                        if(node["isFixingBug"]==True):
-                            vector[2][1] = 1
-                        else:
-                            vector[2][1] = 0
-                        for i in range (50):
-                            if(node["interval"] <= tableInterval[i]):
-                                vector[3][i]=1
-                                break
-                        for type in range(3): #add, delete, churn
-                            for i in range(50):
-                                if( node["churn"][type] <= tableChurn[type][i] ):
-                                    vector[4][type][i] = 1
-                                    break
-                        for pathModule in node["coupling"]:
-                            if(pathModule in module2Num):
-                                vector[5][module2Num[pathModule]] = 1
-                            else:
-                                vector[5][0] = 1
-                        sample["x"]["commitgraph"]["nodes"][node["num"]] = vector[0]+vector[1]+vector[2]+vector[3]+vector[4][0]+vector[4][1]+vector[4][2]+vector[5]
-                        for numParent in node["parents"]:
-                            sample["x"]["commitgraph"]["edges"].append([node["num"], numParent])
+                    pass
                 if(config.checkCommitSeqExists()):
                     commitsOnModule = []
                     for commitOnModule in sampleJson["commitsOnModuleInInterval"]["commitsOnModule"].values():
@@ -172,11 +131,8 @@ class DataManeger(torch.utils.data.Dataset):
                                         commitVector.append(0)
                             sample["x"]["commitseq"].append(commitVector)
                     else:
-                        length = 0
-                        for nameVector in map2StandardizeMetricsCommit:
-                            length += len(map2StandardizeMetricsCommit[nameVector])
-                        commitVector=[0 for x in range(length)]
-                        sample["x"]["commitseq"].append(commitVector)
+                        #コミットがないのはおかしい。飛ばす。
+                        return
                 if(config.checkProcessMetricsExists()):
                     for item in map2StandardizeMetricsProcess:
                         sample["x"]["processmetrics"].append((float(sampleJson["commitsOnModuleInInterval"][item])-map2StandardizeMetricsProcess[item][0]) / map2StandardizeMetricsProcess[item][1])
