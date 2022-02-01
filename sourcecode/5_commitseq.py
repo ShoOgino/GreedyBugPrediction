@@ -16,10 +16,10 @@ if __name__ == '__main__':
         config.TypeInput.commitseq
     ]
     config.pathsDirSampleTrain         = [
-        "C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_train".format(config.project, config.release)
+        "../datasets/{}/R{}_r_train".format(config.project, config.release)
     ]
     config.pathsDirSampleTest          = [
-        "C:/Users/login/data/workspace/MLTool/datasets/{}/output/R{}_r_test".format(config.project, config.release)
+        "../datasets/{}/R{}_r_test".format(config.project, config.release)
     ]
     config.algorithm                   = "DNN"
     config.isCrossValidation           = False
