@@ -128,7 +128,7 @@ class DataManeger(torch.utils.data.Dataset):
                                     if(map2StandardizeMetricsCommit[nameVector][indexVector][1]!=0):
                                         commitVector.append((commitOnModule[nameVector][indexVector]-map2StandardizeMetricsCommit[nameVector][indexVector][0])/map2StandardizeMetricsCommit[nameVector][indexVector][1])
                                     else:
-                                        commitVector.append(0)
+                                        pass
                             sample["x"]["commitseq"].append(commitVector)
                     else:
                         #コミットがないのはおかしい。飛ばす。
@@ -235,6 +235,7 @@ class DataManeger(torch.utils.data.Dataset):
             for item in map2StandardizeMetricsCommit:
                 for i in range(len(metricsCommit[item])):
                     map2StandardizeMetricsCommit[item][i] = [np.array(metricsCommit[item][i]).mean(), np.std(metricsCommit[item][i])]
+            del metricsCommit
         if(config.checkCodeMetricsExists()):
             for pathSample4Train in self.pathsSample4Train:
                 with open(pathSample4Train, encoding="utf-8") as fSample4Train:
