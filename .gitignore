@@ -4,5 +4,6 @@ InferBugs.code-workspace
 __pycache__/
 
 datasets/*
+!datasets/example
 models/*
 results/*
