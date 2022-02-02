@@ -128,7 +128,11 @@ class DataManeger(torch.utils.data.Dataset):
                             for nameVector in map2StandardizeMetricsCommit:
                                 for indexVector in range(len(map2StandardizeMetricsCommit[nameVector])):
                                     if(map2StandardizeMetricsCommit[nameVector][indexVector][1]!=0):
-                                        commitVector.append((commitOnModule[nameVector][indexVector]-map2StandardizeMetricsCommit[nameVector][indexVector][0])/map2StandardizeMetricsCommit[nameVector][indexVector][1])
+                                        commitVector.append(
+                                            (
+                                                (commitOnModule[nameVector][indexVector]-map2StandardizeMetricsCommit[nameVector][indexVector][0])/map2StandardizeMetricsCommit[nameVector][indexVector][1]
+                                            ).astype('float32')
+                                        )
                                     else:
                                         pass
                             sample["x"]["commitseq"].append(commitVector)
