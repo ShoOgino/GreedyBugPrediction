@@ -3,6 +3,7 @@ from src.data.Dataset import Dataset
 from src.log.wrapperLogger import wrapperLogger
 logger = wrapperLogger.setup_logger(__name__, config.getPathFileLog())
 
+import sys
 import glob
 import json
 import os
@@ -10,6 +11,7 @@ import random
 import numpy as np
 import torch
 from torch.functional import split
+from tqdm import tqdm
 
 class DataManeger(torch.utils.data.Dataset):
     def __init__(self):
@@ -130,6 +132,7 @@ class DataManeger(torch.utils.data.Dataset):
                                     else:
                                         pass
                             sample["x"]["commitseq"].append(commitVector)
+                            print(sys.getsizeof(commitVector))
                     else:
                         #コミットがないのはおかしい。飛ばす。
                         return
@@ -252,10 +255,12 @@ class DataManeger(torch.utils.data.Dataset):
                         metricsProcess[item].append(float(sampleJson["commitsOnModuleInInterval"][item]))
             for item in map2StandardizeMetricsProcess:
                 map2StandardizeMetricsProcess[item] = [np.array(metricsProcess[item]).mean(), np.std(metricsProcess[item])]
-        for pathSample4Train in self.pathsSample4Train:
+        for pathSample4Train in tqdm(self.pathsSample4Train):
             loadSample(pathSample4Train, self.samples4Train, map2StandardizeMetricsCommit, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
-        for pathSample4Test in self.pathsSample4Test:
+        print(sys.getsizeof(self.samples4Train))
+        for pathSample4Test in tqdm(self.pathsSample4Test):
             loadSample(pathSample4Test, self.samples4Test, map2StandardizeMetricsCommit, map2StandardizeMetricsCode, map2StandardizeMetricsProcess)
+        print(sys.getsizeof(self.samples4Test))
         logger.info( "\n" +
             "samples4TrainPositive: "+ str(self.getNumOfSamples4TrainPositive()) + "\n" +
             "samples4TrainNegative: "+ str(self.getNumOfSamples4TrainNegative()) + "\n" +
